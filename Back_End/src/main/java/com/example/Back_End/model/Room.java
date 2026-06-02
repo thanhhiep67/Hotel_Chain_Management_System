@@ -1,6 +1,7 @@
 package com.example.Back_End.model;
 
-import com.example.Back_End.model.enums.HotelStatus;
+import com.example.Back_End.model.enums.RoomStatus;
+import com.example.Back_End.model.enums.RoomType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -8,8 +9,6 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
-import org.springframework.data.mongodb.core.index.GeoSpatialIndexType;
-import org.springframework.data.mongodb.core.index.GeoSpatialIndexed;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -21,30 +20,30 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "hotels")
+@Document(collection = "rooms")
 @CompoundIndexes({
-    @CompoundIndex(name = "city_status_rating", def = "{'city': 1, 'status': 1, 'avgRating': -1}"),
-    @CompoundIndex(name = "owner_status", def = "{'ownerId': 1, 'status': 1}")
+    @CompoundIndex(name = "hotel_room_unique", def = "{'hotelId': 1, 'roomNumber': 1}", unique = true),
+    @CompoundIndex(name = "hotel_type_status_price", def = "{'hotelId': 1, 'type': 1, 'status': 1, 'pricePerNight': 1}")
 })
-public class Hotel {
+public class Room {
 
     @Id
     private String id;
 
     @Indexed
-    private String ownerId;
+    private String hotelId;
 
-    private String name;
-
-    private String address;
+    private String roomNumber;
 
     @Indexed
-    private String city;
+    private RoomType type;
+
+    @Indexed
+    private Double pricePerNight;
+
+    private Integer capacity;
 
     private String description;
-
-    @GeoSpatialIndexed(type = GeoSpatialIndexType.GEO_2DSPHERE)
-    private GeoLocation location;
 
     @Builder.Default
     private List<String> amenities = new ArrayList<>();
@@ -54,14 +53,7 @@ public class Hotel {
 
     @Indexed
     @Builder.Default
-    private HotelStatus status = HotelStatus.PENDING;
-
-    @Indexed
-    @Builder.Default
-    private Double avgRating = 0.0;
-
-    @Builder.Default
-    private Integer reviewCount = 0;
+    private RoomStatus status = RoomStatus.AVAILABLE;
 
     private LocalDateTime createdAt;
 

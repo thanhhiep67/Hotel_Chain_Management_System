@@ -1,0 +1,16 @@
+{
+  "properties": [
+    {
+      "name": "qr.checkin.expiry-minutes",
+      "type": "java.lang.Integer",
+      "description": "Lifetime of a check-in QR code in minutes.",
+      "defaultValue": 15
+    },
+    {
+      "name": "qr.checkin.size-px",
+      "type": "java.lang.Integer",
+      "description": "Width and height of the generated QR PNG in pixels.",
+      "defaultValue": 350
+    }
+  ]
+}
