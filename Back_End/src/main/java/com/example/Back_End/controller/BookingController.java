@@ -97,7 +97,7 @@ public class BookingController {
     }
 
     @PatchMapping("/{id}/check-in")
-    @PreAuthorize("hasRole('STAFF')")
+    @PreAuthorize("hasAnyRole('STAFF', 'OWNER')")
     public ResponseEntity<ApiResponse<BookingResponse>> checkIn(
             @PathVariable String id,
             Authentication authentication) {
@@ -110,7 +110,7 @@ public class BookingController {
     }
 
     @PatchMapping("/{id}/check-out")
-    @PreAuthorize("hasRole('STAFF')")
+    @PreAuthorize("hasAnyRole('STAFF', 'OWNER')")
     public ResponseEntity<ApiResponse<BookingResponse>> checkOut(
             @PathVariable String id,
             Authentication authentication) {

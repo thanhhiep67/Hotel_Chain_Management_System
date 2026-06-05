@@ -2,16 +2,25 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 
+const PUBLIC_NAV_LINKS = [
+  { to: '/',          label: 'Trang chủ'  },
+  { to: '/',          label: 'Khách sạn'  },
+  { to: '/discounts', label: 'Ưu đãi'     },
+  { to: '/',          label: 'Điểm đến'   },
+  { to: '/',          label: 'Về chúng tôi' },
+];
+
 const NAV_LINKS = {
   ADMIN: [
     { to: '/admin/dashboard', label: 'Duyệt khách sạn' },
     { to: '/admin/users',     label: 'Người dùng' },
   ],
   OWNER: [
-    { to: '/owner/dashboard', label: 'Khách sạn của tôi' },
-    { to: '/owner/bookings',  label: 'Quản lý Booking'   },
-    { to: '/owner/discounts', label: 'Mã giảm giá'       },
-    { to: '/messages',        label: 'Tin nhắn'          },
+    { to: '/owner/dashboard',  label: 'Khách sạn của tôi' },
+    { to: '/owner/analytics',  label: 'Dashboard'          },
+    { to: '/owner/bookings',   label: 'Quản lý Booking'   },
+    { to: '/owner/discounts',  label: 'Mã giảm giá'       },
+    { to: '/messages',         label: 'Tin nhắn'           },
   ],
   STAFF: [
     { to: '/staff/check-in',  label: 'Check-in'        },
@@ -206,62 +215,93 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
 
+        {/* Logo + Nav */}
         <div className="flex items-center gap-6">
-          <Link to="/" className="text-xl font-bold text-blue-600 tracking-tight shrink-0">
-            Hotel Chain
+          <Link to="/" className="flex items-center gap-2 shrink-0">
+            <div className="w-8 h-8 bg-blue-700 rounded-lg flex items-center justify-center shadow-sm">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+              </svg>
+            </div>
+            <span className="text-lg font-extrabold tracking-tight text-gray-900">
+              Hotel<span className="text-blue-700">Chain</span>
+            </span>
           </Link>
 
-          {links.length > 0 && (
-            <div className="hidden sm:flex items-center gap-1">
-              {links.map((l) => (
-                <Link key={l.to} to={l.to}
-                  className={`relative px-3 py-1.5 text-sm rounded-lg transition font-medium
-                    ${pathname === l.to || pathname.startsWith('/chat')
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-600 hover:bg-gray-100'}`}>
-                  {l.label}
-                  {l.to === '/messages'
-                    && msgUnreadCount > 0
-                    && !pathname.startsWith('/messages')
-                    && !pathname.startsWith('/chat') && (
-                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1
-                      bg-blue-600 text-white text-[10px] font-bold rounded-full
-                      flex items-center justify-center leading-none">
-                      {msgUnreadCount > 9 ? '9+' : msgUnreadCount}
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          )}
+          <div className="hidden sm:flex items-center gap-0.5">
+            {/* Guest: public links | Logged in: role links only */}
+            {!user
+              ? PUBLIC_NAV_LINKS.map((l, i) => (
+                  <Link key={i} to={l.to}
+                    className="px-3 py-1.5 text-sm rounded-lg transition font-medium
+                      text-gray-600 hover:text-gray-900 hover:bg-gray-50">
+                    {l.label}
+                  </Link>
+                ))
+              : links.map((l) => (
+                  <Link key={l.to} to={l.to}
+                    className={`relative px-3 py-1.5 text-sm rounded-lg transition font-medium
+                      ${pathname === l.to || pathname.startsWith('/chat')
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
+                    {l.label}
+                    {l.to === '/messages'
+                      && msgUnreadCount > 0
+                      && !pathname.startsWith('/messages')
+                      && !pathname.startsWith('/chat') && (
+                      <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1
+                        bg-blue-600 text-white text-[10px] font-bold rounded-full
+                        flex items-center justify-center leading-none">
+                        {msgUnreadCount > 9 ? '9+' : msgUnreadCount}
+                      </span>
+                    )}
+                  </Link>
+                ))
+            }
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Right actions */}
+        <div className="flex items-center gap-1.5">
+          {/* Currency badge */}
+          {!user && (
+            <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg
+              border border-gray-200 text-xs font-semibold text-gray-600 cursor-default">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              VND
+            </div>
+          )}
+
           {user ? (
             <>
               {showBell && <NotificationBell />}
-              <span className="text-sm text-gray-600 hidden sm:block ml-1">
-                Xin chào, <span className="font-medium text-gray-800">{user.fullName}</span>
+              <span className="hidden sm:flex items-center gap-1.5 text-sm text-gray-700 ml-1">
+                <span className="w-7 h-7 rounded-full bg-blue-700 text-white font-bold text-xs flex items-center justify-center">
+                  {user.fullName?.[0]?.toUpperCase() ?? 'U'}
+                </span>
+                <span className="font-medium text-gray-800 max-w-28 truncate">{user.fullName}</span>
               </span>
               <button onClick={handleLogout}
-                className="px-4 py-1.5 text-sm border border-gray-300 rounded-lg
-                  hover:bg-gray-50 transition cursor-pointer">
+                className="px-4 py-1.5 text-sm font-medium border border-gray-300 rounded-lg
+                  hover:bg-gray-50 text-gray-700 transition cursor-pointer ml-1">
                 Đăng xuất
               </button>
             </>
           ) : (
             <>
               <Link to="/login"
-                className="px-4 py-1.5 text-sm text-gray-700 border border-gray-300
+                className="px-4 py-1.5 text-sm font-medium text-gray-700 border border-gray-300
                   rounded-lg hover:bg-gray-50 transition">
                 Đăng nhập
               </Link>
               <Link to="/register"
-                className="px-4 py-1.5 text-sm text-white bg-blue-600 rounded-lg
-                  hover:bg-blue-700 transition">
+                className="px-4 py-2 text-sm font-bold text-white bg-blue-700 rounded-lg
+                  hover:bg-blue-800 transition shadow-sm">
                 Đăng ký
               </Link>
             </>

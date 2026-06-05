@@ -47,17 +47,25 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/hotels", "/hotels/**").permitAll()
                         // Room - public GET (xem phòng của hotel)
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/rooms/**").permitAll()
+                        // Review - public GET (xem đánh giá của hotel)
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/reviews/hotel/**").permitAll()
                         // Uploaded chat images — public GET (URL được nhúng trong tin nhắn)
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/uploads/**").permitAll()
                         // Tất cả còn lại cần token
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
-                        // Mặc định Spring Security trả 403 — đổi về 401 để axios interceptor bắt được
+                        // Unauthenticated → 401
                         .authenticationEntryPoint((req, res, authEx) -> {
                             res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             res.setContentType("application/json;charset=UTF-8");
                             res.getWriter().write("{\"statusCode\":401,\"message\":\"Unauthorized\"}");
+                        })
+                        // Authenticated nhưng sai role → 403 chuẩn JSON
+                        .accessDeniedHandler((req, res, accessEx) -> {
+                            res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            res.setContentType("application/json;charset=UTF-8");
+                            res.getWriter().write("{\"statusCode\":403,\"message\":\"Bạn không có quyền thực hiện thao tác này\"}");
                         })
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

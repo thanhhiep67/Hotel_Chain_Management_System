@@ -64,8 +64,21 @@ public class BookingService {
     private int cancelMinDaysBefore;
 
     @Caching(evict = {
+        // Room availability caches
         @CacheEvict(value = "rooms:available",    allEntries = true),
-        @CacheEvict(value = "rooms:booked-dates", allEntries = true)
+        @CacheEvict(value = "rooms:booked-dates", allEntries = true),
+        // Recommendations: user preference changed after new booking
+        @CacheEvict(value = "rec:hybrid",         key = "#userEmail"),
+        @CacheEvict(value = "rec:cbf",            key = "#userEmail"),
+        @CacheEvict(value = "rec:cf",             key = "#userEmail"),
+        // Analytics: new booking affects all hotel-level metrics
+        @CacheEvict(value = "analytics:overview",       allEntries = true),
+        @CacheEvict(value = "analytics:revenue",        allEntries = true),
+        @CacheEvict(value = "analytics:booking-status", allEntries = true),
+        @CacheEvict(value = "analytics:top-rooms",      allEntries = true),
+        @CacheEvict(value = "analytics:discounts",      allEntries = true),
+        @CacheEvict(value = "analytics:price",          allEntries = true),
+        @CacheEvict(value = "analytics:forecast",       allEntries = true),
     })
     public BookingResponse createBooking(String userEmail, BookingRequest request) {
         User user = userRepository.findByEmail(userEmail)
@@ -187,6 +200,10 @@ public class BookingService {
         return toResponseWithGuest(booking, room, hotel, guest);
     }
 
+    @Caching(evict = {
+        @CacheEvict(value = "analytics:overview",       allEntries = true),
+        @CacheEvict(value = "analytics:booking-status", allEntries = true),
+    })
     public BookingResponse confirmBooking(String bookingId, String actorEmail) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
@@ -309,8 +326,13 @@ public class BookingService {
     }
 
     @Caching(evict = {
-        @CacheEvict(value = "rooms:available",    allEntries = true),
-        @CacheEvict(value = "rooms:booked-dates", allEntries = true)
+        @CacheEvict(value = "rooms:available",          allEntries = true),
+        @CacheEvict(value = "rooms:booked-dates",       allEntries = true),
+        @CacheEvict(value = "analytics:overview",       allEntries = true),
+        @CacheEvict(value = "analytics:booking-status", allEntries = true),
+        @CacheEvict(value = "analytics:top-rooms",      allEntries = true),
+        @CacheEvict(value = "analytics:forecast",       allEntries = true),
+        @CacheEvict(value = "analytics:price",          allEntries = true),
     })
     public BookingResponse cancelBooking(String bookingId, String userEmail, ReasonRequest request) {
         User user = userRepository.findByEmail(userEmail)
@@ -370,7 +392,13 @@ public class BookingService {
         return toResponse(saved, room, hotel);
     }
 
-    @CacheEvict(value = "rooms:booked-dates", allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "rooms:booked-dates",       allEntries = true),
+        @CacheEvict(value = "analytics:overview",       allEntries = true),
+        @CacheEvict(value = "analytics:booking-status", allEntries = true),
+        @CacheEvict(value = "analytics:forecast",       allEntries = true),
+        @CacheEvict(value = "analytics:price",          allEntries = true),
+    })
     public BookingResponse rejectBooking(String bookingId, String actorEmail, ReasonRequest request) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
@@ -412,6 +440,10 @@ public class BookingService {
         return toResponse(saved, room, hotel);
     }
 
+    @Caching(evict = {
+        @CacheEvict(value = "analytics:overview",       allEntries = true),
+        @CacheEvict(value = "analytics:booking-status", allEntries = true),
+    })
     public BookingResponse checkIn(String bookingId, String staffEmail) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
@@ -458,8 +490,11 @@ public class BookingService {
     }
 
     @Caching(evict = {
-        @CacheEvict(value = "rooms:available",    allEntries = true),
-        @CacheEvict(value = "rooms:booked-dates", allEntries = true)
+        @CacheEvict(value = "rooms:available",          allEntries = true),
+        @CacheEvict(value = "rooms:booked-dates",       allEntries = true),
+        @CacheEvict(value = "analytics:overview",       allEntries = true),
+        @CacheEvict(value = "analytics:booking-status", allEntries = true),
+        @CacheEvict(value = "analytics:revenue",        allEntries = true),
     })
     public BookingResponse checkOut(String bookingId, String staffEmail) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -549,7 +584,12 @@ public class BookingService {
         User actor = userRepository.findByEmail(actorEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        if (actor.getRole() != UserRole.STAFF || !hotel.getId().equals(actor.getHotelId())) {
+        boolean isStaff = actor.getRole() == UserRole.STAFF
+                && hotel.getId().equals(actor.getHotelId());
+        boolean isOwner = actor.getRole() == UserRole.OWNER
+                && hotel.getOwnerId().equals(actor.getId());
+
+        if (!isStaff && !isOwner) {
             throw new AppException(ErrorCode.BOOKING_ACCESS_DENIED);
         }
     }

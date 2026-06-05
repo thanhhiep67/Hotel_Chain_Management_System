@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Navbar from '../../components/Navbar';
-import { getBookingById, checkOutBooking } from '../../api/bookings';
+import { getBookingById, checkOutBooking, getHotelBookings } from '../../api/bookings';
 import useBookingSocket from '../../hooks/useBookingSocket';
 
 const STATUS_META = {
@@ -17,6 +17,7 @@ const ROOM_TYPE_LABEL = {
   SUITE: 'Suite', DELUXE: 'Deluxe', FAMILY: 'Family',
 };
 
+const todayStr  = () => new Date().toISOString().slice(0, 10);
 const fmtDate   = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('vi-VN') : '—';
 const fmtPrice  = (p) => p != null ? p.toLocaleString('vi-VN') + ' ₫' : '—';
 const fmtNights = (ci, co) => ci && co
@@ -112,6 +113,18 @@ export default function StaffCheckOutPage() {
   }, []);
   const dismissToast = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
 
+  // Gợi ý trả phòng hôm nay
+  const [suggestions,     setSuggestions]     = useState([]);
+  const [suggestLoading,  setSuggestLoading]  = useState(true);
+
+  useEffect(() => {
+    if (!hotelId) { setSuggestLoading(false); return; }
+    getHotelBookings(hotelId, { status: 'CHECKED_IN', checkOut: todayStr(), size: 50 })
+      .then(res => setSuggestions(res.data.data?.content ?? []))
+      .catch(() => {})
+      .finally(() => setSuggestLoading(false));
+  }, [hotelId]);
+
   // Live feed of recently checked-in guests
   const [liveFeed, setLiveFeed] = useState([]);
 
@@ -196,6 +209,7 @@ export default function StaffCheckOutPage() {
       setBooking(res.data.data);
       setSuccess(true);
       setShowConfirm(false);
+      setSuggestions(prev => prev.filter(b => b.id !== booking.id));
     } catch (err) {
       setError(err.response?.data?.message ?? 'Không thể trả phòng. Vui lòng thử lại.');
       setShowConfirm(false);
@@ -230,6 +244,89 @@ export default function StaffCheckOutPage() {
 
         {/* Live feed */}
         <LiveFeed events={liveFeed} />
+
+        {/* ── Gợi ý trả phòng hôm nay ── */}
+        {suggestLoading ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm
+            p-4 mb-4 animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-1/2 mb-3" />
+            {[0,1].map(i => (
+              <div key={i} className="flex items-center gap-3 py-2.5">
+                <div className="w-9 h-9 rounded-full bg-gray-200 shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-gray-200 rounded w-3/4" />
+                  <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : suggestions.filter(b => b.id !== booking?.id).length > 0 && (
+          <div className="bg-white rounded-2xl border border-amber-100
+            shadow-sm mb-4 overflow-hidden">
+
+            {/* Header */}
+            <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100
+              flex items-center gap-2">
+              <span className="text-base">🧳</span>
+              <span className="text-xs font-semibold text-amber-800">
+                Cần trả phòng hôm nay
+              </span>
+              <span className="text-xs text-amber-500 font-normal ml-1">
+                {new Date().toLocaleDateString('vi-VN')}
+              </span>
+              <span className="ml-auto text-xs bg-amber-400 text-white
+                px-2 py-0.5 rounded-full font-bold">
+                {suggestions.filter(b => b.id !== booking?.id).length}
+              </span>
+            </div>
+
+            {/* List — ẩn booking đang được xử lý */}
+            <div className="divide-y divide-gray-50">
+              {suggestions.filter(b => b.id !== booking?.id).map(b => (
+                <div key={b.id}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-amber-50/50 transition">
+
+                  {/* Room avatar */}
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center
+                    justify-center text-amber-700 font-bold text-sm shrink-0">
+                    {b.roomNumber ?? '?'}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      Phòng {b.roomNumber ?? '—'}
+                      {b.guestName && (
+                        <span className="font-normal text-gray-500"> · {b.guestName}</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {fmtNights(b.checkIn, b.checkOut)} đêm ·{' '}
+                      {b.totalPrice != null
+                        ? b.totalPrice.toLocaleString('vi-VN') + ' ₫'
+                        : '—'}
+                    </p>
+                  </div>
+
+                  {/* Quick action */}
+                  <button
+                    onClick={() => {
+                      setBooking(b);
+                      setBookingId(b.id);
+                      setError('');
+                      setSuccess(false);
+                      setShowConfirm(false);
+                      window.scrollTo({ top: 999, behavior: 'smooth' });
+                    }}
+                    className="text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700
+                      text-white rounded-xl transition cursor-pointer font-semibold shrink-0">
+                    Trả phòng
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search card */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">

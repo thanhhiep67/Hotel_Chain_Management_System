@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import { getAdminHotels, updateHotelStatus } from '../../api/admin';
+import { getReviewAlerts, resolveAlert } from '../../api/reviewAlerts';
 
 const STATUS_STYLE = {
   PENDING:  'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -177,9 +178,12 @@ export default function AdminHotelsPage() {
   const [totalPages, setTotalPages]     = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading]           = useState(true);
-  const [confirm, setConfirm]           = useState(null); // { hotel, action }
+  const [confirm, setConfirm]           = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast]               = useState('');
+
+  const [alerts,        setAlerts]        = useState([]);
+  const [resolvingId,   setResolvingId]   = useState(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -201,6 +205,24 @@ export default function AdminHotelsPage() {
   }, []);
 
   useEffect(() => { load(statusFilter, page); }, [statusFilter, page, load]);
+
+  useEffect(() => {
+    getReviewAlerts(false)
+      .then(res => setAlerts(res.data.data ?? []))
+      .catch(() => {});
+  }, []);
+
+  const handleResolve = async (id) => {
+    setResolvingId(id);
+    try {
+      await resolveAlert(id);
+      setAlerts(prev => prev.filter(a => a.id !== id));
+    } catch {
+      showToast('Không thể xử lý cảnh báo');
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   const handleFilterChange = (val) => {
     setStatusFilter(val);
@@ -238,6 +260,65 @@ export default function AdminHotelsPage() {
             Quản lý yêu cầu đăng ký từ các chủ khách sạn
           </p>
         </div>
+
+        {/* ── Cảnh báo review bất thường ── */}
+        {alerts.length > 0 && (
+          <div className="mb-6 space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm font-semibold text-red-600">
+                🚨 Cảnh báo review bất thường
+              </span>
+              <span className="text-xs px-2 py-0.5 bg-red-100 text-red-600
+                rounded-full font-bold">
+                {alerts.length}
+              </span>
+            </div>
+
+            {alerts.map(alert => (
+              <div key={alert.id}
+                className="bg-red-50 border border-red-200 rounded-xl px-4 py-3
+                  flex flex-col sm:flex-row sm:items-center gap-3">
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-red-700">
+                      {alert.userFullName}
+                    </span>
+                    <span className="text-xs text-red-400">{alert.userEmail}</span>
+                  </div>
+                  <p className="text-xs text-red-600 mt-0.5">
+                    Đánh giá <strong>1 sao 3 lần liên tiếp</strong> tại{' '}
+                    <span className="font-medium">{alert.hotelName}</span>
+                  </p>
+                  <p className="text-xs text-red-400 mt-0.5">
+                    Phát hiện lúc:{' '}
+                    {alert.triggeredAt
+                      ? new Date(alert.triggeredAt).toLocaleString('vi-VN')
+                      : '—'}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    to={`/admin/users`}
+                    className="px-3 py-1.5 text-xs border border-red-300 text-red-600
+                      rounded-lg hover:bg-red-100 transition">
+                    Xem user
+                  </Link>
+                  <button
+                    onClick={() => handleResolve(alert.id)}
+                    disabled={resolvingId === alert.id}
+                    className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700
+                      disabled:bg-red-400 text-white rounded-lg transition cursor-pointer font-medium">
+                    {resolvingId === alert.id ? '...' : '✓ Đã xử lý'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Filter tabs */}
         <div className="flex flex-wrap gap-2 mb-6">

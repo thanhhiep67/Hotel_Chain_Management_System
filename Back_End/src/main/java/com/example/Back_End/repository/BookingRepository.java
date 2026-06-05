@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 public interface BookingRepository extends MongoRepository<Booking, String> {
@@ -36,6 +37,11 @@ public interface BookingRepository extends MongoRepository<Booking, String> {
     Page<Booking> findByUserIdAndStatusOrderByCreatedAtDesc(String userId, BookingStatus status, Pageable pageable);
 
     List<Booking> findByRoomIdAndStatusIn(String roomId, List<BookingStatus> statuses);
+
+    List<Booking> findByUserIdAndStatusIn(String userId, List<BookingStatus> statuses);
+
+    List<Booking> findByRoomIdInAndUserIdNotAndStatusIn(
+            Collection<String> roomIds, String userId, List<BookingStatus> statuses);
 
     @Query("{ 'checkIn': ?0, 'status': { $in: ?1 } }")
     List<Booking> findByCheckInDateAndStatusIn(LocalDate checkIn, List<BookingStatus> statuses);

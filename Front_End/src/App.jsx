@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import HomePage from './pages/HomePage';
 import HotelDetailPage from './pages/HotelDetailPage';
 import OwnerDashboardPage from './pages/owner/OwnerDashboardPage';
+import AnalyticsDashboardPage from './pages/owner/AnalyticsDashboardPage';
 import HotelFormPage from './pages/owner/HotelFormPage';
 import AdminHotelsPage from './pages/admin/AdminHotelsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
@@ -16,6 +17,7 @@ import BookingDetailPage from './pages/BookingDetailPage';
 import HotelBookingsPage from './pages/HotelBookingsPage';
 import HotelBookingDetailPage from './pages/HotelBookingDetailPage';
 import DiscountsPage from './pages/owner/DiscountsPage';
+import RoomManagementPage from './pages/owner/RoomManagementPage';
 import DiscountsPublicPage from './pages/DiscountsPublicPage';
 import StaffCheckInPage from './pages/staff/StaffCheckInPage';
 import StaffCheckOutPage from './pages/staff/StaffCheckOutPage';
@@ -69,11 +71,17 @@ function App() {
         <Route path="/owner/dashboard" element={
           <ProtectedRoute roles={['OWNER']}><OwnerDashboardPage /></ProtectedRoute>
         } />
+        <Route path="/owner/analytics" element={
+          <ProtectedRoute roles={['OWNER']}><AnalyticsDashboardPage /></ProtectedRoute>
+        } />
         <Route path="/owner/hotels/new" element={
           <ProtectedRoute roles={['OWNER']}><HotelFormPage /></ProtectedRoute>
         } />
         <Route path="/owner/hotels/:id/edit" element={
           <ProtectedRoute roles={['OWNER']}><HotelFormPage /></ProtectedRoute>
+        } />
+        <Route path="/owner/hotels/:id/rooms" element={
+          <ProtectedRoute roles={['OWNER']}><RoomManagementPage /></ProtectedRoute>
         } />
         <Route path="/owner/bookings" element={
           <ProtectedRoute roles={['OWNER']}><HotelBookingsPage /></ProtectedRoute>

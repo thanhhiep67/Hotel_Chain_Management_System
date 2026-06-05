@@ -93,11 +93,16 @@ function HotelCard({ hotel, onEdit, onDelete }) {
           )}
         </div>
 
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
           <Link to={`/hotels/${hotel.id}`} className="text-sm text-blue-600 hover:underline">
             Xem chi tiết →
           </Link>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Link to={`/owner/hotels/${hotel.id}/rooms`}
+              className="px-3 py-1.5 text-sm bg-blue-50 border border-blue-200 text-blue-700
+                hover:bg-blue-100 rounded-xl transition font-medium">
+              🛏️ Quản lý phòng
+            </Link>
             <button onClick={() => onEdit(hotel)}
               className="px-3 py-1.5 text-sm border border-gray-300 rounded-xl
                 hover:bg-gray-50 transition cursor-pointer">

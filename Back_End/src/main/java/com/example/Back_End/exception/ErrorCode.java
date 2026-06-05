@@ -40,6 +40,13 @@ public enum ErrorCode {
     MESSAGE_INVALID_THREAD(HttpStatus.BAD_REQUEST, "Invalid thread ID format"),
     MESSAGE_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Gửi quá nhiều tin nhắn, vui lòng thử lại sau"),
     MESSAGE_INVALID_FILE(HttpStatus.BAD_REQUEST, "Only image files are allowed (jpg, png, gif, webp)"),
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "Review not found"),
+    REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "Booking đã được đánh giá"),
+    REVIEW_BOOKING_NOT_ELIGIBLE(HttpStatus.BAD_REQUEST, "Booking không hợp lệ: phải thuộc về bạn và ở trạng thái CHECKED_OUT"),
+    REVIEW_INVALID_RATING(HttpStatus.BAD_REQUEST, "Rating phải trong khoảng 1–5"),
+    REVIEW_ACCESS_DENIED(HttpStatus.FORBIDDEN, "Bạn không có quyền thao tác với review này"),
+    REVIEW_REPLY_BLANK(HttpStatus.BAD_REQUEST, "Nội dung phản hồi không được để trống"),
+    REVIEW_INVALID_STATUS(HttpStatus.BAD_REQUEST, "Status không hợp lệ"),
     QR_INVALID(HttpStatus.BAD_REQUEST, "QR code is invalid or has expired"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 

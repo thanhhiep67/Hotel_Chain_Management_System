@@ -75,6 +75,7 @@ public class RedisConfig implements CachingConfigurer {
         return RedisCacheManager.builder(factory)
                 .cacheDefaults(base.entryTtl(Duration.ofMinutes(5)))
                 .withInitialCacheConfigurations(Map.of(
+                        // ── Existing ──────────────────────────────────────
                         "hotels:search",      base.entryTtl(Duration.ofMinutes(5)),
                         "hotels:detail",      base.entryTtl(Duration.ofMinutes(10)),
                         "hotels:admin",       base.entryTtl(Duration.ofMinutes(2)),
@@ -83,6 +84,20 @@ public class RedisConfig implements CachingConfigurer {
                         "bookings:my",        base.entryTtl(Duration.ofMinutes(2)),
                         "bookings:hotel",     base.entryTtl(Duration.ofMinutes(1)),
                         "rooms:booked-dates", base.entryTtl(Duration.ofMinutes(1))
+                ))
+                .withInitialCacheConfigurations(Map.of(
+                        // ── Recommendations ───────────────────────────────
+                        "rec:hybrid",           base.entryTtl(Duration.ofMinutes(30)),
+                        "rec:cbf",              base.entryTtl(Duration.ofMinutes(30)),
+                        "rec:cf",               base.entryTtl(Duration.ofHours(1)),
+                        // ── Analytics ─────────────────────────────────────
+                        "analytics:overview",        base.entryTtl(Duration.ofMinutes(10)),
+                        "analytics:revenue",         base.entryTtl(Duration.ofMinutes(15)),
+                        "analytics:booking-status",  base.entryTtl(Duration.ofMinutes(10)),
+                        "analytics:top-rooms",       base.entryTtl(Duration.ofMinutes(15)),
+                        "analytics:discounts",       base.entryTtl(Duration.ofMinutes(30)),
+                        "analytics:price",           base.entryTtl(Duration.ofHours(1)),
+                        "analytics:forecast",        base.entryTtl(Duration.ofMinutes(30))
                 ))
                 .build();
     }
