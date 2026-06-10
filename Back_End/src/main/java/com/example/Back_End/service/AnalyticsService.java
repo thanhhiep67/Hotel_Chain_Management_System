@@ -33,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -453,5 +454,58 @@ public class AnalyticsService {
 
     private static double round1(double v) {
         return Math.round(v * 10.0) / 10.0;
+    }
+
+    // ── 8. Doanh thu theo phương thức thanh toán ────────────────────────
+
+    public List<Map<String, Object>> getPaymentMethodBreakdown(String ownerEmail, String hotelId,
+                                                                LocalDate from, LocalDate to) {
+        getHotelForOwner(ownerEmail, hotelId);
+
+        List<String> bookingIds = mongoTemplate.find(
+                Query.query(Criteria.where("hotelId").is(hotelId)), Booking.class)
+                .stream().map(Booking::getId).collect(Collectors.toList());
+
+        // Build skeleton with all months in range (even if empty)
+        Map<String, Map<String, Double>> byMonth = new LinkedHashMap<>();
+        YearMonth ymStart = YearMonth.from(from);
+        YearMonth ymEnd   = YearMonth.from(to);
+        for (YearMonth ym = ymStart; !ym.isAfter(ymEnd); ym = ym.plusMonths(1)) {
+            byMonth.put(String.format("%02d/%d", ym.getMonthValue(), ym.getYear()), new LinkedHashMap<>());
+        }
+
+        if (!bookingIds.isEmpty()) {
+            LocalDateTime fromDt = from.atStartOfDay();
+            LocalDateTime toDt   = to.atTime(23, 59, 59);
+
+            Aggregation agg = Aggregation.newAggregation(
+                    Aggregation.match(Criteria.where("bookingId").in(bookingIds)
+                            .and("status").is("PAID")
+                            .and("paidAt").gte(fromDt).lte(toDt)),
+                    Aggregation.project()
+                            .and(DateOperators.Year.yearOf("paidAt")).as("year")
+                            .and(DateOperators.Month.monthOf("paidAt")).as("month")
+                            .andInclude("method", "amount"),
+                    Aggregation.group("year", "month", "method").sum("amount").as("total"),
+                    Aggregation.sort(Sort.by("_id.year", "_id.month"))
+            );
+
+            for (Document doc : mongoTemplate.aggregate(agg, "payments", Document.class).getMappedResults()) {
+                Document id    = doc.get("_id", Document.class);
+                String   key   = String.format("%02d/%d", id.getInteger("month"), id.getInteger("year"));
+                String   method = id.getString("method");
+                double   total  = ((Number) doc.get("total")).doubleValue();
+                if (byMonth.containsKey(key) && method != null) {
+                    byMonth.get(key).merge(method, total, Double::sum);
+                }
+            }
+        }
+
+        return byMonth.entrySet().stream().map(e -> {
+            Map<String, Object> point = new LinkedHashMap<>();
+            point.put("month", e.getKey());
+            point.putAll(e.getValue());
+            return point;
+        }).collect(Collectors.toList());
     }
 }

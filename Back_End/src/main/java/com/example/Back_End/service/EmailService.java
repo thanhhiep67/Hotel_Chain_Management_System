@@ -2,6 +2,7 @@ package com.example.Back_End.service;
 
 import com.example.Back_End.model.Booking;
 import com.example.Back_End.model.Hotel;
+import com.example.Back_End.model.Payment;
 import com.example.Back_End.model.Room;
 import com.example.Back_End.model.User;
 import jakarta.mail.MessagingException;
@@ -273,6 +274,173 @@ public class EmailService {
                     + row("Tổng thanh toán",
                           "<strong style='color:#4f46e5;font-size:16px'>" + totalFmt + "</strong>")
         );
+    }
+
+    /* ── Payment confirmation — VNPay callback (includes transactionId + method) ── */
+    @Async
+    public void sendPaymentConfirmEmail(User user, Booking booking, Room room, Hotel hotel,
+                                         Payment payment) {
+        try {
+            MimeMessage mime = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mime, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(user.getEmail());
+            helper.setSubject("💳 Xác nhận thanh toán #"
+                    + booking.getId().substring(0, 8).toUpperCase() + " - Hotel Chain");
+            helper.setText(buildVNPayConfirmHtml(user, booking, room, hotel, payment), true);
+            mailSender.send(mime);
+        } catch (MessagingException e) {
+            log.error("[Email] Failed to send VNPay payment confirmation to {}: {}",
+                    user.getEmail(), e.getMessage());
+        }
+    }
+
+    private String buildVNPayConfirmHtml(User user, Booking booking, Room room, Hotel hotel,
+                                          Payment payment) {
+        long nights      = ChronoUnit.DAYS.between(booking.getCheckIn(), booking.getCheckOut());
+        String roomNum   = room  != null ? room.getRoomNumber()                  : "—";
+        String roomType  = room  != null ? formatRoomType(room.getType().name()) : "—";
+        String hotelName = hotel != null ? hotel.getName()                       : "Hotel Chain";
+        String hotelAddr = hotel != null ? hotel.getAddress() + ", " + hotel.getCity() : "—";
+        String totalFmt  = String.format("%,.0f₫", booking.getTotalPrice());
+        String origFmt   = String.format("%,.0f₫",
+                booking.getOriginalPrice() != null ? booking.getOriginalPrice() : booking.getTotalPrice());
+
+        String txnId    = payment.getTransactionId() != null ? payment.getTransactionId() : "—";
+        String payRef   = "#" + payment.getId().substring(0, 8).toUpperCase();
+        String methodLbl = formatPaymentMethod(payment.getMethod() != null
+                ? payment.getMethod().name() : "");
+        String paidAtStr = payment.getPaidAt() != null
+                ? payment.getPaidAt().format(
+                    java.time.format.DateTimeFormatter.ofPattern("HH:mm · dd/MM/yyyy"))
+                : java.time.LocalDateTime.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern("HH:mm · dd/MM/yyyy"));
+
+        String discountRow = (booking.getDiscountAmount() != null && booking.getDiscountAmount() > 0)
+                ? row("Giá gốc",  origFmt)
+                  + row("Giảm giá",
+                        "<span style='color:#16a34a'>− "
+                        + String.format("%,.0f₫", booking.getDiscountAmount()) + "</span>")
+                : "";
+
+        return """
+                <!DOCTYPE html>
+                <html lang="vi">
+                <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+                <body style="margin:0;padding:0;background:#f4f6f9;font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e">
+                  <table width="100%%" cellpadding="0" cellspacing="0">
+                    <tr><td align="center" style="padding:32px 16px">
+                      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%%">
+
+                        <!-- Header -->
+                        <tr><td style="background:linear-gradient(135deg,#312e81,#6366f1);border-radius:16px 16px 0 0;padding:36px 40px;text-align:center">
+                          <p style="margin:0 0 4px;font-size:13px;color:#c7d2fe;letter-spacing:2px;text-transform:uppercase">Hotel Chain</p>
+                          <h1 style="margin:0;font-size:26px;font-weight:700;color:#ffffff">Thanh toán thành công!</h1>
+                          <p style="margin:12px 0 0;font-size:14px;color:#e0e7ff">Giao dịch của bạn đã được xử lý an toàn</p>
+                        </td></tr>
+
+                        <!-- Amount hero -->
+                        <tr><td style="background:#ffffff;padding:32px 40px 8px;text-align:center">
+                          <p style="margin:0 0 4px;font-size:13px;color:#6b7280">Số tiền đã thanh toán</p>
+                          <p style="margin:0;font-size:40px;font-weight:800;color:#4f46e5;letter-spacing:-1px">%s</p>
+                          <p style="margin:8px 0 0;font-size:12px;color:#9ca3af">%s</p>
+                        </td></tr>
+
+                        <!-- Status badge -->
+                        <tr><td style="background:#ffffff;padding:12px 40px 8px;text-align:center">
+                          <span style="display:inline-block;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;
+                            border-radius:100px;padding:6px 20px;font-size:13px;font-weight:600">
+                            💳 Đã thanh toán
+                          </span>
+                          <p style="margin:14px 0 0;font-size:15px;color:#374151">
+                            Xin chào <strong>%s</strong>, cảm ơn bạn đã thanh toán!
+                          </p>
+                        </td></tr>
+
+                        <!-- Transaction info -->
+                        <tr><td style="background:#ffffff;padding:20px 40px 4px">
+                          <table width="100%%" cellpadding="0" cellspacing="0"
+                            style="border:1px solid #ddd6fe;border-radius:12px;overflow:hidden;background:#faf5ff">
+                            <tr><td colspan="2"
+                              style="background:#ede9fe;padding:14px 20px;font-size:13px;font-weight:700;
+                                color:#5b21b6;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #ddd6fe">
+                              Thông tin giao dịch
+                            </td></tr>
+                            %s%s%s%s
+                          </table>
+                        </td></tr>
+
+                        <!-- Booking details -->
+                        <tr><td style="background:#ffffff;padding:16px 40px">
+                          <table width="100%%" cellpadding="0" cellspacing="0"
+                            style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+                            <tr><td colspan="2"
+                              style="background:#f8fafc;padding:14px 20px;font-size:13px;font-weight:700;
+                                color:#6b7280;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #e5e7eb">
+                              Chi tiết đặt phòng
+                            </td></tr>
+                            %s%s%s%s%s%s%s%s
+                          </table>
+                        </td></tr>
+
+                        <!-- Note -->
+                        <tr><td style="background:#ffffff;padding:8px 40px 28px">
+                          <div style="background:#f5f3ff;border-left:4px solid #6366f1;border-radius:8px;padding:14px 18px">
+                            <p style="margin:0;font-size:13px;color:#4338ca;line-height:1.6">
+                              📋 Lưu email này làm bằng chứng thanh toán.<br>
+                              📱 Mã QR nhận phòng có sẵn trong ứng dụng sau khi booking được xác nhận.
+                            </p>
+                          </div>
+                        </td></tr>
+
+                        <!-- Footer -->
+                        <tr><td style="background:#f8fafc;border-radius:0 0 16px 16px;padding:20px 40px;text-align:center;
+                          border-top:1px solid #e5e7eb">
+                          <p style="margin:0;font-size:12px;color:#9ca3af">
+                            © 2025 Hotel Chain · Email này được gửi tự động, vui lòng không reply.
+                          </p>
+                        </td></tr>
+
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(
+                // hero
+                totalFmt, paidAtStr,
+                // greeting
+                user.getFullName(),
+                // transaction block
+                row("Mã giao dịch",  "<strong style='font-family:monospace;color:#4f46e5'>" + txnId + "</strong>"),
+                row("Mã thanh toán", "<span style='font-family:monospace'>" + payRef + "</span>"),
+                row("Phương thức",   methodLbl),
+                row("Thời gian",     paidAtStr),
+                // booking block
+                row("Mã booking",    "#" + booking.getId().substring(0, 8).toUpperCase()),
+                row("Khách sạn",     hotelName),
+                row("Địa chỉ",       hotelAddr),
+                row("Phòng",         roomNum + " · " + roomType),
+                row("Nhận phòng",    booking.getCheckIn().format(DATE_FMT)),
+                row("Trả phòng",     booking.getCheckOut().format(DATE_FMT)),
+                row("Số đêm / Khách",nights + " đêm · " + booking.getGuestCount() + " khách"),
+                discountRow
+                + row("Tổng thanh toán",
+                      "<strong style='color:#4f46e5;font-size:16px'>" + totalFmt + "</strong>")
+        );
+    }
+
+    private static String formatPaymentMethod(String method) {
+        return switch (method) {
+            case "VNPAY"         -> "VNPay";
+            case "MOMO"          -> "MoMo";
+            case "ZALOPAY"       -> "ZaloPay";
+            case "CASH"          -> "Tiền mặt";
+            case "CREDIT_CARD"   -> "Thẻ tín dụng";
+            case "DEBIT_CARD"    -> "Thẻ ghi nợ";
+            case "BANK_TRANSFER" -> "Chuyển khoản";
+            default              -> method.isEmpty() ? "—" : method;
+        };
     }
 
     /* ── Check-in reminder ── */

@@ -9,7 +9,8 @@ export const getBookingsByStatus = (hotelId, params)       => api.get('/analytic
 export const getTopRooms        = (hotelId, params)        => api.get('/analytics/top-rooms',          { params: { hotelId, ...params } });
 export const getDiscountStats   = (hotelId, params)        => api.get('/analytics/discounts',          { params: { hotelId, ...params } });
 export const getPriceSuggestion = (hotelId)                => api.get('/analytics/price-suggestion',   { params: { hotelId } });
-export const getForecast        = (hotelId)                => api.get('/analytics/forecast',            { params: { hotelId } });
+export const getForecast               = (hotelId)         => api.get('/analytics/forecast',          { params: { hotelId } });
+export const getPaymentMethodBreakdown = (hotelId, params) => api.get('/analytics/payment-methods',   { params: { hotelId, ...params } });
 
 export const exportExcel = async (hotelId, from, to) => {
   const token = localStorage.getItem('accessToken');

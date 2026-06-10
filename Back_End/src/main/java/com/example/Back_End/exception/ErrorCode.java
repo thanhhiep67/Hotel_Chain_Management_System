@@ -48,6 +48,12 @@ public enum ErrorCode {
     REVIEW_REPLY_BLANK(HttpStatus.BAD_REQUEST, "Nội dung phản hồi không được để trống"),
     REVIEW_INVALID_STATUS(HttpStatus.BAD_REQUEST, "Status không hợp lệ"),
     QR_INVALID(HttpStatus.BAD_REQUEST, "QR code is invalid or has expired"),
+    PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Payment not found"),
+    PAYMENT_ALREADY_PAID(HttpStatus.CONFLICT, "Booking has already been paid"),
+    PAYMENT_INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "Payment amount does not match booking total"),
+    PAYMENT_SIGNATURE_INVALID(HttpStatus.BAD_REQUEST, "Invalid payment signature"),
+    PAYMENT_GATEWAY_ERROR(HttpStatus.BAD_GATEWAY, "Payment gateway error"),
+    PAYMENT_REFUND_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Only PAID payments can be refunded"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 
     private final HttpStatus httpStatus;

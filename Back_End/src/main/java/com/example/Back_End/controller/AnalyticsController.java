@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/analytics")
@@ -75,6 +76,16 @@ public class AnalyticsController {
             @RequestParam String hotelId,
             Authentication auth) {
         return ok(analyticsService.getForecast(email(auth), hotelId));
+    }
+
+    /** GET /analytics/payment-methods?hotelId=&from=&to= */
+    @GetMapping("/payment-methods")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getPaymentMethodBreakdown(
+            @RequestParam String hotelId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            Authentication auth) {
+        return ok(analyticsService.getPaymentMethodBreakdown(email(auth), hotelId, from, to));
     }
 
     /** GET /analytics/price-suggestion?hotelId= */

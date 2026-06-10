@@ -1,13 +1,26 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700&display=swap&subset=latin,vietnamese');
 
-*, *::before, *::after {
-  box-sizing: border-box;
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --c-gold:      #C9A84C;
+  --c-gold-h:    #E0BC5E;
+  
+    --c-dark:      #20242C;
+    --c-surface:   #2B313A;
+ 
+  --c-page:      #F7F6F4;
+  --font-display:'Cormorant Garamond', Georgia, serif;
+  --font-body:   'Outfit', system-ui, -apple-system, sans-serif;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  background-color: var(--c-page);
+  color: #1a1a1a;
 }
 
 @keyframes slideInRight {

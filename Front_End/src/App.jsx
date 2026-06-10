@@ -14,6 +14,9 @@ import AdminUsersPage from './pages/admin/AdminUsersPage';
 import BookingPage from './pages/BookingPage';
 import MyBookingsPage from './pages/MyBookingsPage';
 import BookingDetailPage from './pages/BookingDetailPage';
+import PaymentPage from './pages/PaymentPage';
+import PaymentResultPage from './pages/PaymentResultPage';
+import PaymentHistoryPage from './pages/PaymentHistoryPage';
 import HotelBookingsPage from './pages/HotelBookingsPage';
 import HotelBookingDetailPage from './pages/HotelBookingDetailPage';
 import DiscountsPage from './pages/owner/DiscountsPage';
@@ -48,6 +51,15 @@ function App() {
         } />
         <Route path="/my-bookings/:id" element={
           <ProtectedRoute roles={['USER']}><BookingDetailPage /></ProtectedRoute>
+        } />
+        <Route path="/payment/:bookingId" element={
+          <ProtectedRoute roles={['USER']}><PaymentPage /></ProtectedRoute>
+        } />
+        <Route path="/payment-result" element={
+          <ProtectedRoute roles={['USER']}><PaymentResultPage /></ProtectedRoute>
+        } />
+        <Route path="/my-payments" element={
+          <ProtectedRoute roles={['USER']}><PaymentHistoryPage /></ProtectedRoute>
         } />
         <Route path="/chat/:threadId" element={
           <ProtectedRoute roles={['USER', 'STAFF', 'OWNER']}><ChatPage /></ProtectedRoute>

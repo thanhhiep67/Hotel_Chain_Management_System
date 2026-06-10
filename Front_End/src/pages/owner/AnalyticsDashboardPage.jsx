@@ -6,6 +6,7 @@ import { getHotelBookings, checkInBooking } from '../../api/bookings';
 import {
   getOverview, getRevenue, getBookingsByStatus,
   getTopRooms, getDiscountStats, exportExcel, getPriceSuggestion, getForecast,
+  getPaymentMethodBreakdown,
 } from '../../api/analytics';
 import {
   LineChart, Line, BarChart, Bar, LabelList,
@@ -89,6 +90,21 @@ const PAY_META = {
   PAID:     { label: 'Đã thanh toán',  cls: 'bg-green-50  text-green-700  border-green-200'  },
   UNPAID:   { label: 'Chưa thanh toán', cls: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
   REFUNDED: { label: 'Đã hoàn tiền',   cls: 'bg-blue-50   text-blue-700   border-blue-200'   },
+};
+
+const METHOD_COLOR = {
+  VNPAY:         '#0057A8',
+  CASH:          '#6B7280',
+  MOMO:          '#AE2070',
+  ZALOPAY:       '#0068FF',
+  CREDIT_CARD:   '#7C3AED',
+  DEBIT_CARD:    '#0891B2',
+  BANK_TRANSFER: '#059669',
+};
+const METHOD_LABEL_VN = {
+  VNPAY: 'VNPay', CASH: 'Tiền mặt', MOMO: 'MoMo',
+  ZALOPAY: 'ZaloPay', CREDIT_CARD: 'Thẻ tín dụng',
+  DEBIT_CARD: 'Thẻ ghi nợ', BANK_TRANSFER: 'Chuyển khoản',
 };
 
 /* ── Custom tooltip for LineChart ── */
@@ -202,6 +218,8 @@ export default function AnalyticsDashboardPage() {
   const [dsLoading,  setDsLoading]  = useState(false);
   const [psLoading,  setPsLoading]  = useState(false);
   const [fcLoading,  setFcLoading]  = useState(false);
+  const [pmData,     setPmData]     = useState([]);
+  const [pmLoading,  setPmLoading]  = useState(false);
   const [exporting,  setExporting]  = useState(false);
 
   /* Quick action states */
@@ -274,6 +292,12 @@ export default function AnalyticsDashboardPage() {
       .then(r => setForecast(r.data.data))
       .catch(() => {})
       .finally(() => setFcLoading(false));
+
+    setPmLoading(true);
+    getPaymentMethodBreakdown(hotelId, { from, to })
+      .then(r => setPmData(r.data.data ?? []))
+      .catch(() => {})
+      .finally(() => setPmLoading(false));
   }, [hotelId, from, to, period]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -536,6 +560,113 @@ export default function AnalyticsDashboardPage() {
             )}
           </div>
         </div>
+
+        {/* ── Payment method breakdown ── */}
+        {(() => {
+          const methods = [...new Set(pmData.flatMap(d => Object.keys(d).filter(k => k !== 'month')))];
+          const totalByMethod = methods.reduce((acc, m) => {
+            acc[m] = pmData.reduce((s, d) => s + (d[m] ?? 0), 0);
+            return acc;
+          }, {});
+          const grandTotal = Object.values(totalByMethod).reduce((s, v) => s + v, 0);
+          const pieDataPm = methods.map(m => ({
+            name: METHOD_LABEL_VN[m] ?? m,
+            value: totalByMethod[m] ?? 0,
+            color: METHOD_COLOR[m] ?? '#94A3B8',
+          })).filter(d => d.value > 0);
+
+          return (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+                <div>
+                  <h2 className="font-semibold text-gray-900">Doanh thu theo phương thức thanh toán</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Breakdown VNPay · Tiền mặt · các ví theo tháng</p>
+                </div>
+                {grandTotal > 0 && (
+                  <span className="text-sm font-semibold text-gray-700 bg-gray-50 border border-gray-100 px-3 py-1 rounded-xl">
+                    Tổng: {fmtVnd(grandTotal)}
+                  </span>
+                )}
+              </div>
+
+              {pmLoading ? (
+                <div className="h-64 bg-gray-50 rounded-xl animate-pulse" />
+              ) : pmData.length === 0 || grandTotal === 0 ? (
+                <div className="h-64 flex flex-col items-center justify-center text-gray-400">
+                  <p className="text-3xl mb-2">💳</p>
+                  <p className="text-sm">Chưa có giao dịch thanh toán nào trong khoảng này</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                  {/* Stacked bar — left 2/3 */}
+                  <div className="lg:col-span-2">
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={pmData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9CA3AF' }}
+                          tickLine={false} axisLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
+                          tickFormatter={v => v >= 1_000_000 ? `${(v/1_000_000).toFixed(1)}M`
+                            : v >= 1_000 ? `${(v/1_000).toFixed(0)}K` : v} />
+                        <Tooltip
+                          formatter={(value, name) => [fmtVnd(value), METHOD_LABEL_VN[name] ?? name]}
+                          contentStyle={{ borderRadius: '12px', border: '1px solid #F3F4F6', fontSize: 12 }}
+                        />
+                        <Legend formatter={name => <span style={{fontSize:11,color:'#6B7280'}}>{METHOD_LABEL_VN[name] ?? name}</span>} />
+                        {methods.map(m => (
+                          <Bar key={m} dataKey={m} stackId="a"
+                            fill={METHOD_COLOR[m] ?? '#94A3B8'}
+                            radius={methods.indexOf(m) === methods.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                          />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Donut pie + summary — right 1/3 */}
+                  <div className="flex flex-col gap-4">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <PieChart>
+                        <Pie data={pieDataPm} cx="50%" cy="50%"
+                          outerRadius={70} innerRadius={38}
+                          dataKey="value" labelLine={false}
+                          label={({ percent }) => percent > 0.06 ? `${(percent * 100).toFixed(0)}%` : ''}
+                        >
+                          {pieDataPm.map((entry, i) => (
+                            <Cell key={i} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v, n) => [fmtVnd(v), n]}
+                          contentStyle={{ borderRadius: '10px', fontSize: 11 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    {/* Method list */}
+                    <div className="space-y-2">
+                      {pieDataPm.sort((a, b) => b.value - a.value).map(d => (
+                        <div key={d.name} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ background: d.color }} />
+                            <span className="text-gray-600">{d.name}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-semibold text-gray-800 text-xs">{fmtVnd(d.value)}</span>
+                            <span className="text-gray-400 text-xs ml-1.5">
+                              {grandTotal > 0 ? `${((d.value / grandTotal) * 100).toFixed(1)}%` : ''}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── Top 5 phòng & Discount stats row ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

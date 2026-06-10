@@ -16,8 +16,12 @@ import com.example.Back_End.model.User;
 import com.example.Back_End.model.enums.BookingStatus;
 import com.example.Back_End.model.enums.RoomStatus;
 import com.example.Back_End.model.enums.UserRole;
+import com.example.Back_End.model.Payment;
+import com.example.Back_End.model.enums.PaymentStatus;
+import com.example.Back_End.dto.response.PaymentNotification;
 import com.example.Back_End.repository.BookingRepository;
 import com.example.Back_End.repository.HotelRepository;
+import com.example.Back_End.repository.PaymentRepository;
 import com.example.Back_End.repository.RoomRepository;
 import com.example.Back_End.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +54,7 @@ import java.util.List;
 public class BookingService {
 
     private final BookingRepository     bookingRepository;
+    private final PaymentRepository     paymentRepository;
     private final RoomRepository        roomRepository;
     private final HotelRepository       hotelRepository;
     private final UserRepository        userRepository;
@@ -360,6 +365,24 @@ public class BookingService {
         Booking saved = bookingRepository.save(booking);
         Hotel hotel = hotelRepository.findById(saved.getHotelId()).orElse(null);
         Room  room  = roomRepository.findById(saved.getRoomId()).orElse(null);
+
+        // Cancel all pending payments for this booking and notify user in real-time
+        List<Payment> pendingPayments = paymentRepository
+                .findAllByBookingIdAndStatus(saved.getId(), PaymentStatus.PENDING);
+        for (Payment p : pendingPayments) {
+            p.setStatus(PaymentStatus.CANCELLED);
+            paymentRepository.save(p);
+            PaymentNotification pn = PaymentNotification.builder()
+                    .eventType("PAYMENT_FAILED")
+                    .paymentId(p.getId())
+                    .bookingId(p.getBookingId())
+                    .method(p.getMethod())
+                    .amount(p.getAmount())
+                    .currency(p.getCurrency())
+                    .status(PaymentStatus.CANCELLED)
+                    .build();
+            messagingTemplate.convertAndSendToUser(user.getEmail(), "/queue/notifications", pn);
+        }
 
         BookingNotification cancelledNotif = BookingNotification.builder()
                 .eventType("BOOKING_CANCELLED")

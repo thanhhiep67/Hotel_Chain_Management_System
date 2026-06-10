@@ -17,17 +17,29 @@ const TITLES = {
   BOOKING_CHECKED_IN: { user: 'Đã nhận phòng',           hotel: 'Khách đã nhận phòng'      },
   BOOKING_CHECKED_OUT:{ user: 'Đã trả phòng',            hotel: 'Khách đã trả phòng'       },
   BOOKING_PAID:       { user: 'Thanh toán thành công',   hotel: 'Khách đã thanh toán'      },
+  PAYMENT_SUCCESS:    { user: 'Thanh toán thành công',   hotel: 'Khách đã thanh toán'      },
+  PAYMENT_FAILED:     { user: 'Thanh toán thất bại',     hotel: 'Thanh toán thất bại'      },
   NEW_MESSAGE:        { user: 'Tin nhắn mới',            hotel: 'Tin nhắn mới'             },
 };
 
+const METHOD_LABEL = { VNPAY: 'VNPay', MOMO: 'MoMo', ZALOPAY: 'ZaloPay', CASH: 'Tiền mặt', CREDIT_CARD: 'Thẻ tín dụng', BANK_TRANSFER: 'Chuyển khoản' };
+
 function normalizeWsEvent(raw, isForUser) {
-  const key    = isForUser ? 'user' : 'hotel';
-  const title  = TITLES[raw.eventType]?.[key] ?? 'Thông báo';
-  const room   = raw.roomNumber ? `Phòng ${raw.roomNumber}` : '—';
-  const dates  = `${FMT_DATE(raw.checkIn)} → ${FMT_DATE(raw.checkOut)}`;
-  const guests = raw.guestCount ? `, ${raw.guestCount} khách` : '';
-  const reason = raw.cancelReason ? `. Lý do: ${raw.cancelReason}` : '';
-  const message = `${room}, ${dates}${guests}${reason}`;
+  const key   = isForUser ? 'user' : 'hotel';
+  const title = TITLES[raw.eventType]?.[key] ?? 'Thông báo';
+
+  let message;
+  if (raw.eventType?.startsWith('PAYMENT_')) {
+    const amt    = raw.amount != null ? raw.amount.toLocaleString('vi-VN') + ' ₫' : '—';
+    const method = raw.method ? ` · ${METHOD_LABEL[raw.method] ?? raw.method}` : '';
+    message = `${amt}${method}`;
+  } else {
+    const room   = raw.roomNumber ? `Phòng ${raw.roomNumber}` : '—';
+    const dates  = `${FMT_DATE(raw.checkIn)} → ${FMT_DATE(raw.checkOut)}`;
+    const guests = raw.guestCount ? `, ${raw.guestCount} khách` : '';
+    const reason = raw.cancelReason ? `. Lý do: ${raw.cancelReason}` : '';
+    message = `${room}, ${dates}${guests}${reason}`;
+  }
 
   return {
     id:            null,
@@ -35,11 +47,14 @@ function normalizeWsEvent(raw, isForUser) {
     title,
     message,
     referenceId:   raw.bookingId,
-    referenceType: 'BOOKING',
+    referenceType: raw.eventType?.startsWith('PAYMENT_') ? 'PAYMENT' : 'BOOKING',
     hotelId:       raw.hotelId,
     isRead:        false,
-    createdAt:     raw.createdAt ?? new Date().toISOString(),
+    createdAt:     raw.paidAt ?? raw.createdAt ?? new Date().toISOString(),
     receivedAt:    Date.now(),
+    paymentId:     raw.paymentId,
+    paymentStatus: raw.status,
+    amount:        raw.amount,
   };
 }
 

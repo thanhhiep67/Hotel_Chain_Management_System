@@ -51,6 +51,8 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/reviews/hotel/**").permitAll()
                         // Uploaded chat images — public GET (URL được nhúng trong tin nhắn)
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/uploads/**").permitAll()
+                        // VNPay callbacks — không có JWT (browser redirect & server-to-server)
+                        .requestMatchers("/payments/vnpay/return", "/payments/vnpay/ipn").permitAll()
                         // Tất cả còn lại cần token
                         .anyRequest().authenticated()
                 )

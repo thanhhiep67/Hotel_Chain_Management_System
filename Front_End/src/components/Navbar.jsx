@@ -2,34 +2,34 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 
+/* ─── nav links (unchanged) ─────────────────────────────────── */
 const PUBLIC_NAV_LINKS = [
-  { to: '/',          label: 'Trang chủ'  },
-  { to: '/',          label: 'Khách sạn'  },
-  { to: '/discounts', label: 'Ưu đãi'     },
-  { to: '/',          label: 'Điểm đến'   },
-  { to: '/',          label: 'Về chúng tôi' },
+  { to: '/my-bookings', label: 'Đặt phòng của tôi' },
+    { to: '/discounts',   label: 'Khuyến mãi'         },
+    { to: '/messages',    label: 'Tin nhắn'            },
 ];
 
 const NAV_LINKS = {
   ADMIN: [
     { to: '/admin/dashboard', label: 'Duyệt khách sạn' },
-    { to: '/admin/users',     label: 'Người dùng' },
+    { to: '/admin/users',     label: 'Người dùng'      },
   ],
   OWNER: [
-    { to: '/owner/dashboard',  label: 'Khách sạn của tôi' },
-    { to: '/owner/analytics',  label: 'Dashboard'          },
-    { to: '/owner/bookings',   label: 'Quản lý Booking'   },
-    { to: '/owner/discounts',  label: 'Mã giảm giá'       },
-    { to: '/messages',         label: 'Tin nhắn'           },
+    { to: '/owner/dashboard', label: 'Khách sạn của tôi' },
+    { to: '/owner/analytics', label: 'Dashboard'          },
+    { to: '/owner/bookings',  label: 'Quản lý Booking'   },
+    { to: '/owner/discounts', label: 'Mã giảm giá'       },
+    { to: '/messages',        label: 'Tin nhắn'           },
   ],
   STAFF: [
-    { to: '/staff/check-in',  label: 'Check-in'        },
-    { to: '/staff/check-out', label: 'Check-out'        },
-    { to: '/staff/bookings',  label: 'Quản lý Booking'  },
-    { to: '/messages',        label: 'Tin nhắn'         },
+    { to: '/staff/check-in',  label: 'Check-in'       },
+    { to: '/staff/check-out', label: 'Check-out'       },
+    { to: '/staff/bookings',  label: 'Quản lý Booking' },
+    { to: '/messages',        label: 'Tin nhắn'        },
   ],
   USER: [
     { to: '/my-bookings', label: 'Đặt phòng của tôi' },
+    { to: '/my-payments', label: 'Lịch sử thanh toán' },
     { to: '/discounts',   label: 'Khuyến mãi'         },
     { to: '/messages',    label: 'Tin nhắn'            },
   ],
@@ -37,161 +37,292 @@ const NAV_LINKS = {
 
 function fmtRelative(ts) {
   if (!ts) return '';
-  const now  = Date.now();
-  const ms   = now - new Date(ts).getTime();
+  const ms   = Date.now() - new Date(ts).getTime();
   const mins = Math.floor(ms / 60000);
-  if (mins < 1)  return 'Vừa xong';
-  if (mins < 60) return `${mins} phút trước`;
+  if (mins < 1)   return 'Vừa xong';
+  if (mins < 60)  return `${mins} phút trước`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24)  return `${hrs} giờ trước`;
+  if (hrs  < 24)  return `${hrs} giờ trước`;
   const days = Math.floor(hrs / 24);
   if (days === 1) return 'Hôm qua';
   if (days < 7)   return `${days} ngày trước`;
-  return new Date(ts).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+  return new Date(ts).toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit' });
 }
 
 const EVENT_META = {
-  BOOKING_CREATED:     { icon: '📩', label: 'Booking mới',           bg: 'hover:bg-gray-50',   color: 'text-gray-900'   },
-  BOOKING_CANCELLED:   { icon: '❌', label: 'Khách hủy',             bg: 'hover:bg-red-50',    color: 'text-red-700'    },
-  BOOKING_CONFIRMED:   { icon: '✅', label: 'Đặt phòng đã xác nhận', bg: 'hover:bg-green-50',  color: 'text-green-700'  },
-  BOOKING_REJECTED:    { icon: '🚫', label: 'Đặt phòng bị từ chối', bg: 'hover:bg-red-50',    color: 'text-red-700'    },
-  BOOKING_CHECKED_IN:  { icon: '🏠', label: 'Khách nhận phòng',      bg: 'hover:bg-blue-50',   color: 'text-blue-700'   },
-  BOOKING_CHECKED_OUT: { icon: '🧳', label: 'Khách trả phòng',       bg: 'hover:bg-indigo-50', color: 'text-indigo-700' },
-  BOOKING_PAID:        { icon: '💳', label: 'Khách đã thanh toán',   bg: 'hover:bg-violet-50', color: 'text-violet-700' },
+  BOOKING_CREATED:     { dot:'#C9A84C', label:'Booking mới'            },
+  BOOKING_CANCELLED:   { dot:'#f87171', label:'Khách hủy'              },
+  BOOKING_CONFIRMED:   { dot:'#4ade80', label:'Đã xác nhận'            },
+  BOOKING_REJECTED:    { dot:'#f87171', label:'Bị từ chối'             },
+  BOOKING_CHECKED_IN:  { dot:'#60a5fa', label:'Khách nhận phòng'       },
+  BOOKING_CHECKED_OUT: { dot:'#a78bfa', label:'Khách trả phòng'        },
+  BOOKING_PAID:        { dot:'#34d399', label:'Đã thanh toán'          },
 };
 
-/* ── Notification bell ── */
+/* ─── CSS (injected once) ────────────────────────────────────── */
+const NAV_CSS = `
+
+  :root {
+    --nav-bg:      #1C1917;
+    --nav-border:  rgba(255,255,255,0.07);
+    --nav-text:    rgba(242,240,235,0.55);
+    --nav-text-h:  #F2F0EB;
+    --nav-gold:    #C9A84C;
+    --nav-gold-d:  #8A6E30;
+    --nav-active:  rgba(201,168,76,0.12);
+    --nav-hover:   rgba(255,255,255,0.05);
+    --font-d: 'Cormorant Garamond', Georgia, serif;
+    --font-b: 'Outfit', system-ui, sans-serif;
+    --t: all 0.18s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* ── nav shell ── */
+  .nav-shell {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--nav-bg);
+    border-bottom: 1px solid var(--nav-border);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 4px 24px rgba(0,0,0,0.4);
+    font-family: var(--font-b);
+  }
+  .nav-inner {
+    max-width: 1280px; margin: 0 auto;
+    padding: 0 28px; height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 24px;
+  }
+
+  /* ── logo ── */
+  .nav-logo { display:flex; align-items:center; gap:10px; text-decoration:none; flex-shrink:0; }
+  .nav-logo-icon {
+    width:32px; height:32px; border-radius:9px;
+    background:var(--nav-gold); display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 2px 8px rgba(201,168,76,0.35);
+  }
+  .nav-logo-icon svg { width:16px; height:16px; color:#0C0C0E; }
+  .nav-logo-text {
+    font-family: var(--font-d); font-size:20px; font-weight:700;
+    color: var(--nav-text-h); letter-spacing:-0.01em; line-height:1;
+  }
+  .nav-logo-text em { font-style:normal; color:var(--nav-gold); }
+
+  /* ── links ── */
+  .nav-links { display:flex; align-items:center; gap:2px; flex:1; }
+  .nav-link {
+    position:relative; padding:7px 13px; border-radius:8px;
+    font-size:13px; font-weight:500; color:var(--nav-text);
+    text-decoration:none; transition:var(--t); white-space:nowrap;
+  }
+  .nav-link:hover { color:var(--nav-text-h); background:var(--nav-hover); }
+  .nav-link.active { color:var(--nav-gold); background:var(--nav-active); }
+  .nav-link-badge {
+    position:absolute; top:-4px; right:-4px;
+    min-width:17px; height:17px; padding:0 4px;
+    background:var(--nav-gold); color:#0C0C0E;
+    font-size:10px; font-weight:700; border-radius:9px;
+    display:flex; align-items:center; justify-content:center; line-height:1;
+  }
+
+  /* ── right actions ── */
+  .nav-right { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+
+  /* currency chip */
+  .nav-currency {
+    display:flex; align-items:center; gap:5px;
+    padding:6px 11px; border:1px solid var(--nav-border);
+    border-radius:8px; font-size:12px; font-weight:500;
+    color:var(--nav-text); cursor:default; transition:var(--t);
+  }
+
+  /* bell */
+  .nav-bell { position:relative; }
+  .nav-bell-btn {
+    width:36px; height:36px; border-radius:9px; border:none;
+    background:rgba(255,255,255,0.04); border:1px solid var(--nav-border);
+    color:var(--nav-text); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:var(--t);
+  }
+  .nav-bell-btn:hover { background:var(--nav-hover); color:var(--nav-text-h); border-color:var(--nav-border); }
+  .nav-bell-badge {
+    position:absolute; top:-3px; right:-3px;
+    display:flex; width:18px; height:18px;
+  }
+  .nav-bell-ping {
+    position:absolute; width:100%; height:100%; border-radius:50%;
+    background:rgba(201,168,76,0.5); animation:nb-ping 1.2s cubic-bezier(0,0,0.2,1) infinite;
+  }
+  .nav-bell-dot {
+    position:relative; width:18px; height:18px; border-radius:50%;
+    background:var(--nav-gold); color:#0C0C0E;
+    font-size:9px; font-weight:800;
+    display:flex; align-items:center; justify-content:center; line-height:1;
+  }
+  @keyframes nb-ping { 75%,100%{transform:scale(1.8);opacity:0} }
+
+  /* dropdown */
+  .nav-dropdown {
+    position:absolute; right:0; top:calc(100% + 10px);
+    width:320px; background:#242018;
+    border:1px solid rgba(255,255,255,0.1); border-radius:14px;
+    box-shadow:0 16px 48px rgba(0,0,0,0.6); overflow:hidden; z-index:60;
+  }
+  .nav-dd-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.06);
+  }
+  .nav-dd-title { font-size:13px; font-weight:600; color:#F2F0EB; }
+  .nav-dd-count {
+    font-size:11px; font-weight:600; padding:2px 8px;
+    background:rgba(201,168,76,0.15); color:var(--nav-gold);
+    border:1px solid rgba(201,168,76,0.25); border-radius:20px;
+  }
+  .nav-dd-actions { display:flex; align-items:center; gap:10px; }
+  .nav-dd-btn {
+    font-size:11px; font-weight:500; background:none; border:none;
+    cursor:pointer; transition:var(--t); font-family:var(--font-b);
+  }
+  .nav-dd-btn-read { color:var(--nav-gold); }
+  .nav-dd-btn-read:hover { color:#e0bc5e; }
+  .nav-dd-btn-clear { color:rgba(242,240,235,0.3); }
+  .nav-dd-btn-clear:hover { color:#f87171; }
+  .nav-dd-list { max-height:380px; overflow-y:auto; }
+  .nav-dd-list::-webkit-scrollbar { width:3px; }
+  .nav-dd-list::-webkit-scrollbar-track { background:transparent; }
+  .nav-dd-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:2px; }
+  .nav-dd-item {
+    display:flex; align-items:flex-start; gap:10px;
+    padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.04);
+    transition:background 0.15s; cursor:default;
+  }
+  .nav-dd-item:last-child { border-bottom:none; }
+  .nav-dd-item:hover { background:rgba(255,255,255,0.03); }
+  .nav-dd-item.unread { background:rgba(201,168,76,0.04); border-left:2px solid var(--nav-gold); padding-left:14px; }
+  .nav-dd-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; margin-top:5px; }
+  .nav-dd-body { flex:1; min-width:0; }
+  .nav-dd-item-title { font-size:12px; font-weight:600; color:#F2F0EB; line-height:1.3; }
+  .nav-dd-item-msg { font-size:11px; color:rgba(242,240,235,0.45); margin-top:2px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .nav-dd-time { font-size:10px; color:rgba(242,240,235,0.25); white-space:nowrap; flex-shrink:0; margin-top:2px; }
+  .nav-dd-empty { padding:40px 16px; text-align:center; }
+  .nav-dd-empty-glyph { font-size:28px; color:rgba(255,255,255,0.08); font-family:var(--font-d); margin-bottom:8px; }
+  .nav-dd-empty-text { font-size:12px; color:rgba(242,240,235,0.3); }
+  .nav-dd-footer { padding:10px 16px; border-top:1px solid rgba(255,255,255,0.06); text-align:center; font-size:11px; color:rgba(242,240,235,0.25); }
+
+  /* avatar + name */
+  .nav-avatar {
+    width:32px; height:32px; border-radius:50%; flex-shrink:0;
+    background:var(--nav-gold); color:#0C0C0E;
+    font-size:13px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    border:1.5px solid rgba(201,168,76,0.4);
+    font-family:var(--font-b);
+  }
+  .nav-username {
+    font-size:13px; font-weight:500; color:var(--nav-text);
+    max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+
+  /* buttons */
+  .nav-btn-logout {
+    padding:7px 14px; font-size:12px; font-weight:600; font-family:var(--font-b);
+    border:1px solid rgba(255,255,255,0.12); border-radius:8px;
+    color:var(--nav-text); background:none; cursor:pointer; transition:var(--t);
+  }
+  .nav-btn-logout:hover { border-color:rgba(248,113,113,0.35); color:#f87171; background:rgba(248,113,113,0.06); }
+  .nav-btn-login {
+    padding:7px 16px; font-size:13px; font-weight:500; font-family:var(--font-b);
+    border:1px solid rgba(255,255,255,0.12); border-radius:8px;
+    color:var(--nav-text); text-decoration:none; transition:var(--t); white-space:nowrap;
+  }
+  .nav-btn-login:hover { color:var(--nav-text-h); border-color:var(--nav-border); background:var(--nav-hover); }
+  .nav-btn-register {
+    padding:7px 18px; font-size:13px; font-weight:700; font-family:var(--font-b);
+    background:var(--nav-gold); color:#0C0C0E; border:none;
+    border-radius:8px; text-decoration:none; transition:var(--t);
+    box-shadow:0 2px 10px rgba(201,168,76,0.25); white-space:nowrap;
+  }
+  .nav-btn-register:hover { background:#e0bc5e; box-shadow:0 4px 16px rgba(201,168,76,0.4); }
+
+  @media(max-width:768px) {
+    .nav-links { display:none; }
+    .nav-currency { display:none; }
+    .nav-username { display:none; }
+    .nav-inner { padding:0 16px; }
+  }
+`;
+
+/* ─── NotificationBell ───────────────────────────────────────── */
 function NotificationBell() {
   const { notifications, unreadCount, markAllRead, clearAll } = useNotifications();
-  // Lọc NEW_MESSAGE ra khỏi bell — hiển thị riêng trên tab Tin nhắn
   const bellNotifs = notifications.filter(n => n.type !== 'NEW_MESSAGE');
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, []);
 
   return (
-    <div ref={ref} className="relative">
-
-      {/* Bell button */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="relative p-2 rounded-lg hover:bg-gray-100 transition cursor-pointer"
-        title="Thông báo">
-        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor"
-          strokeWidth={1.8} viewBox="0 0 24 24">
+    <div ref={ref} className="nav-bell" style={{position:'relative'}}>
+      <button className="nav-bell-btn" onClick={() => setOpen(v => !v)} title="Thông báo">
+        <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round"
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002
-               6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6
-               8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6
-               0v1a3 3 0 11-6 0v-1m6 0H9" />
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
         </svg>
-
-        {/* Badge — pulse khi có unread */}
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 w-4">
-            <span className="animate-ping absolute inline-flex h-full w-full
-              rounded-full bg-red-400 opacity-60" />
-            <span className="relative inline-flex items-center justify-center
-              h-4 w-4 rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
+          <span className="nav-bell-badge">
+            <span className="nav-bell-ping" />
+            <span className="nav-bell-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>
           </span>
         )}
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl
-          border border-gray-100 z-50 overflow-hidden">
-
+        <div className="nav-dropdown">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-900">Thông báo</span>
-              {unreadCount > 0 && (
-                <span className="px-1.5 py-0.5 text-[11px] font-semibold
-                  bg-red-100 text-red-600 rounded-full">
-                  {unreadCount} mới
-                </span>
-              )}
+          <div className="nav-dd-header">
+            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+              <span className="nav-dd-title">Thông báo</span>
+              {unreadCount > 0 && <span className="nav-dd-count">{unreadCount} mới</span>}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="nav-dd-actions">
               {unreadCount > 0 && (
-                <button onClick={markAllRead}
-                  className="text-xs text-blue-600 hover:text-blue-800
-                    font-medium transition cursor-pointer">
-                  Đánh dấu đã đọc
-                </button>
+                <button className="nav-dd-btn nav-dd-btn-read" onClick={markAllRead}>Đánh dấu đã đọc</button>
               )}
               {bellNotifs.length > 0 && (
-                <button onClick={clearAll}
-                  className="text-xs text-gray-400 hover:text-red-500 transition cursor-pointer">
-                  Xóa tất cả
-                </button>
+                <button className="nav-dd-btn nav-dd-btn-clear" onClick={clearAll}>Xóa tất cả</button>
               )}
             </div>
           </div>
 
           {/* List */}
-          <div className="max-h-96 overflow-y-auto divide-y divide-gray-50">
+          <div className="nav-dd-list">
             {bellNotifs.length === 0 ? (
-              <div className="py-12 flex flex-col items-center gap-2 text-gray-400">
-                <span className="text-3xl">🔔</span>
-                <p className="text-sm">Chưa có thông báo nào</p>
+              <div className="nav-dd-empty">
+                <div className="nav-dd-empty-glyph">✦</div>
+                <div className="nav-dd-empty-text">Chưa có thông báo nào</div>
               </div>
             ) : (
               bellNotifs.map((n, i) => {
                 const meta = EVENT_META[n.type] ?? EVENT_META.BOOKING_CREATED;
                 return (
                   <div key={`${n.type}-${n.referenceId ?? i}-${n.receivedAt}`}
-                    className={`px-4 py-3 transition cursor-default ${meta.bg}
-                      ${!n.isRead ? 'border-l-2 border-blue-400' : 'border-l-2 border-transparent'}`}>
-
-                    <div className="flex items-start gap-2.5">
-                      {/* Unread dot */}
-                      <div className="mt-1.5 shrink-0">
-                        {!n.isRead
-                          ? <span className="block w-2 h-2 rounded-full bg-blue-500" />
-                          : <span className="block w-2 h-2" />}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-1">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-sm shrink-0">{meta.icon}</span>
-                            <p className={`text-sm font-medium truncate ${meta.color}`}>
-                              {n.title}
-                            </p>
-                          </div>
-                          <span className="text-[11px] text-gray-400 shrink-0 whitespace-nowrap mt-0.5">
-                            {fmtRelative(n.receivedAt)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
-                          {n.message}
-                        </p>
-                      </div>
+                    className={`nav-dd-item ${!n.isRead ? 'unread' : ''}`}>
+                    <span className="nav-dd-dot" style={{background: meta.dot}} />
+                    <div className="nav-dd-body">
+                      <div className="nav-dd-item-title">{n.title}</div>
+                      <div className="nav-dd-item-msg">{n.message}</div>
                     </div>
+                    <div className="nav-dd-time">{fmtRelative(n.receivedAt)}</div>
                   </div>
                 );
               })
             )}
           </div>
 
-          {/* Footer */}
           {bellNotifs.length > 0 && (
-            <div className="px-4 py-2.5 border-t border-gray-100 text-center">
-              <span className="text-xs text-gray-400">
-                {bellNotifs.length} thông báo
-              </span>
-            </div>
+            <div className="nav-dd-footer">{bellNotifs.length} thông báo</div>
           )}
         </div>
       )}
@@ -199,115 +330,96 @@ function NotificationBell() {
   );
 }
 
-/* ── Main Navbar ── */
+/* ─── Main Navbar ────────────────────────────────────────────── */
 export default function Navbar() {
-  const navigate       = useNavigate();
-  const { pathname }   = useLocation();
-  const userStr        = localStorage.getItem('user');
-  const user           = userStr ? JSON.parse(userStr) : null;
-  const links          = user ? (NAV_LINKS[user.role] ?? []) : [];
-  const showBell       = user?.role === 'OWNER' || user?.role === 'STAFF' || user?.role === 'USER';
+  const navigate     = useNavigate();
+  const { pathname } = useLocation();
+
+  const user    = (() => { try { return JSON.parse(localStorage.getItem('user')); } catch { return null; } })();
+  const links   = user ? (NAV_LINKS[user.role] ?? []) : PUBLIC_NAV_LINKS;
+  const showBell = user?.role === 'OWNER' || user?.role === 'STAFF' || user?.role === 'USER';
   const { msgUnreadCount } = useNotifications();
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/');
-  };
+  const handleLogout = () => { localStorage.clear(); navigate('/'); };
+
+  const isActive = (to) => pathname === to || (to !== '/' && pathname.startsWith(to));
 
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+    <>
+      <style>{NAV_CSS}</style>
+      <nav className="nav-shell">
+        <div className="nav-inner">
 
-        {/* Logo + Nav */}
-        <div className="flex items-center gap-6">
-          <Link to="/" className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 bg-blue-700 rounded-lg flex items-center justify-center shadow-sm">
-              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+          {/* ── Logo ── */}
+          <Link to="/" className="nav-logo">
+            <div className="nav-logo-icon">
+              <svg fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
               </svg>
             </div>
-            <span className="text-lg font-extrabold tracking-tight text-gray-900">
-              Hotel<span className="text-blue-700">Chain</span>
+            <span className="nav-logo-text">
+              Hotel<em>Chain</em>
             </span>
           </Link>
 
-          <div className="hidden sm:flex items-center gap-0.5">
-            {/* Guest: public links | Logged in: role links only */}
-            {!user
-              ? PUBLIC_NAV_LINKS.map((l, i) => (
-                  <Link key={i} to={l.to}
-                    className="px-3 py-1.5 text-sm rounded-lg transition font-medium
-                      text-gray-600 hover:text-gray-900 hover:bg-gray-50">
-                    {l.label}
-                  </Link>
-                ))
-              : links.map((l) => (
-                  <Link key={l.to} to={l.to}
-                    className={`relative px-3 py-1.5 text-sm rounded-lg transition font-medium
-                      ${pathname === l.to || pathname.startsWith('/chat')
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
-                    {l.label}
-                    {l.to === '/messages'
-                      && msgUnreadCount > 0
-                      && !pathname.startsWith('/messages')
-                      && !pathname.startsWith('/chat') && (
-                      <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1
-                        bg-blue-600 text-white text-[10px] font-bold rounded-full
-                        flex items-center justify-center leading-none">
-                        {msgUnreadCount > 9 ? '9+' : msgUnreadCount}
-                      </span>
-                    )}
-                  </Link>
-                ))
-            }
+          {/* ── Nav links ── */}
+          <div className="nav-links">
+            {links.map((l, i) => (
+              <Link
+                key={`${l.to}-${i}`}
+                to={l.to}
+                className={`nav-link ${isActive(l.to) ? 'active' : ''}`}
+              >
+                {l.label}
+                {l.to === '/messages'
+                  && msgUnreadCount > 0
+                  && !pathname.startsWith('/messages')
+                  && !pathname.startsWith('/chat') && (
+                  <span className="nav-link-badge">
+                    {msgUnreadCount > 9 ? '9+' : msgUnreadCount}
+                  </span>
+                )}
+              </Link>
+            ))}
           </div>
-        </div>
 
-        {/* Right actions */}
-        <div className="flex items-center gap-1.5">
-          {/* Currency badge */}
-          {!user && (
-            <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg
-              border border-gray-200 text-xs font-semibold text-gray-600 cursor-default">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-              VND
-            </div>
-          )}
+          {/* ── Right ── */}
+          <div className="nav-right">
+            {!user && (
+              <div className="nav-currency">
+                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                VND
+              </div>
+            )}
 
-          {user ? (
-            <>
-              {showBell && <NotificationBell />}
-              <span className="hidden sm:flex items-center gap-1.5 text-sm text-gray-700 ml-1">
-                <span className="w-7 h-7 rounded-full bg-blue-700 text-white font-bold text-xs flex items-center justify-center">
-                  {user.fullName?.[0]?.toUpperCase() ?? 'U'}
-                </span>
-                <span className="font-medium text-gray-800 max-w-28 truncate">{user.fullName}</span>
-              </span>
-              <button onClick={handleLogout}
-                className="px-4 py-1.5 text-sm font-medium border border-gray-300 rounded-lg
-                  hover:bg-gray-50 text-gray-700 transition cursor-pointer ml-1">
-                Đăng xuất
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login"
-                className="px-4 py-1.5 text-sm font-medium text-gray-700 border border-gray-300
-                  rounded-lg hover:bg-gray-50 transition">
-                Đăng nhập
-              </Link>
-              <Link to="/register"
-                className="px-4 py-2 text-sm font-bold text-white bg-blue-700 rounded-lg
-                  hover:bg-blue-800 transition shadow-sm">
-                Đăng ký
-              </Link>
-            </>
-          )}
+            {user ? (
+              <>
+                {showBell && <NotificationBell />}
+
+                {/* Avatar + name */}
+                <div style={{display:'flex',alignItems:'center',gap:'8px',margin:'0 4px'}}>
+                  <div className="nav-avatar">
+                    {user.fullName?.[0]?.toUpperCase() ?? 'U'}
+                  </div>
+                  <span className="nav-username">{user.fullName}</span>
+                </div>
+
+                <button className="nav-btn-logout" onClick={handleLogout}>
+                  Đăng xuất
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="nav-btn-login">Đăng nhập</Link>
+                <Link to="/register" className="nav-btn-register">Đăng ký</Link>
+              </>
+            )}
+          </div>
+
         </div>
-      </div>
-    </nav>
+      </nav>
+    </>
   );
 }
