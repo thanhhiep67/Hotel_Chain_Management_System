@@ -29,6 +29,52 @@ const nMonthsAgo = (n) => {
   return d.toISOString().slice(0, 10);
 };
 
+// MongoDB $week: 0-53, Sunday-start
+function mongoWeekNum(date) {
+  const year = date.getFullYear();
+  const jan1 = new Date(year, 0, 1);
+  const jan1Day = jan1.getDay(); // 0=Sun
+  const dayOfYear = Math.floor((date - jan1) / 86400000);
+  const week0Days = jan1Day === 0 ? 0 : 7 - jan1Day;
+  if (dayOfYear < week0Days) return 0;
+  return Math.floor((dayOfYear - week0Days) / 7) + 1;
+}
+
+// Fill skeleton of all weekly/monthly periods in [from, to] with 0 where missing
+function fillRevenuePeriods(data, from, to, period) {
+  const map = {};
+  data.forEach(d => { map[d.period] = d; });
+
+  const result = [];
+  const endDate = new Date(Math.min(new Date(to + 'T23:59:59'), new Date()));
+
+  if (period === 'monthly') {
+    let cur = new Date(from + 'T00:00:00');
+    cur = new Date(cur.getFullYear(), cur.getMonth(), 1);
+    while (cur <= endDate) {
+      const y = cur.getFullYear();
+      const m = String(cur.getMonth() + 1).padStart(2, '0');
+      const key = `${y}-${m}`;
+      const label = `${cur.getMonth() + 1}/${y}`;
+      result.push({ ...(map[key] ?? { period: key, revenue: 0, bookingCount: 0 }), label });
+      cur = new Date(y, cur.getMonth() + 1, 1);
+    }
+  } else {
+    let cur = new Date(from + 'T00:00:00');
+    cur.setDate(cur.getDate() - cur.getDay()); // back to Sunday
+    while (cur <= endDate) {
+      const y = cur.getFullYear();
+      const w = mongoWeekNum(cur);
+      const key = `${y}-W${String(w).padStart(2, '0')}`;
+      const label = `${y} T${w}`;
+      result.push({ ...(map[key] ?? { period: key, revenue: 0, bookingCount: 0 }), label });
+      cur = new Date(cur);
+      cur.setDate(cur.getDate() + 7);
+    }
+  }
+  return result;
+}
+
 const ROOM_TYPE_LABEL = {
   SINGLE:  'Phòng đơn',
   DOUBLE:  'Phòng đôi',
@@ -336,12 +382,7 @@ export default function AnalyticsDashboardPage() {
     color: STATUS_COLOR[d.status] ?? '#94A3B8',
   }));
 
-  const lineData = revenue.map(d => ({
-    ...d,
-    label: d.period.includes('W')
-      ? d.period.replace('-W', ' T')
-      : d.period.replace('-', '/'),
-  }));
+  const lineData = fillRevenuePeriods(revenue, from, to, period);
 
   /* ── Loading skeleton ── */
   if (hotelsLoading) {

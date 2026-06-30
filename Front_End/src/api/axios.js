@@ -20,9 +20,23 @@ function getTokenExp(token) {
 // Dùng chung cho cả request interceptor (proactive) và response interceptor (reactive)
 let refreshPromise = null;
 
+function clearSession() {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+}
+
 function doRefresh() {
   if (!refreshPromise) {
     const refreshToken = localStorage.getItem('refreshToken');
+
+    // Không có refresh token → clear và redirect ngay, không gọi backend
+    if (!refreshToken) {
+      clearSession();
+      window.location.href = '/login';
+      return Promise.reject(new Error('No refresh token'));
+    }
+
     refreshPromise = axios
       .post(`${BASE_URL}/auth/refresh`, { refreshToken })
       .then(({ data }) => {
@@ -31,7 +45,7 @@ function doRefresh() {
         return data.data.accessToken;
       })
       .catch((e) => {
-        localStorage.clear();
+        clearSession();
         window.location.href = '/login';
         throw e;
       })
@@ -71,6 +85,9 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
+
+    // Không retry nếu chính request refresh bị 401 (tránh vòng lặp)
+    if (original?.url?.includes('/auth/')) return Promise.reject(error);
 
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;

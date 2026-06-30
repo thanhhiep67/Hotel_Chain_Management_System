@@ -5,6 +5,7 @@ import com.example.Back_End.dto.request.HotelRequest;
 import com.example.Back_End.dto.request.UpdateHotelStatusRequest;
 import com.example.Back_End.dto.response.HotelDetailResponse;
 import com.example.Back_End.dto.response.HotelResponse;
+import com.example.Back_End.dto.response.NearbyHotelResponse;
 import com.example.Back_End.dto.response.PageResponse;
 import com.example.Back_End.dto.response.RoomResponse;
 import com.example.Back_End.exception.AppException;
@@ -26,10 +27,15 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.geo.Metrics;
+import org.springframework.data.geo.Point;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.NearQuery;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+
+import com.example.Back_End.util.CityUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,6 +48,7 @@ public class HotelService {
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
     private final MongoTemplate mongoTemplate;
+    private final GeocodingService geocodingService;
 
     public void assignStaff(String hotelId, String ownerEmail, AssignStaffRequest request) {
         Hotel hotel = hotelRepository.findById(hotelId)
@@ -121,7 +128,11 @@ public class HotelService {
         // Bước 2: query hotels APPROVED + filter city + chỉ hotel có phòng khớp
         Criteria hotelCriteria = Criteria.where("status").is(HotelStatus.APPROVED);
         if (city != null && !city.isBlank()) {
-            hotelCriteria = hotelCriteria.and("city").regex(city.trim(), "i");
+            String slug = CityUtils.normalize(city);
+            Criteria cityCriteria = new Criteria().orOperator(
+                    Criteria.where("city").regex(city.trim(), "i"),
+                    Criteria.where("citySlug").regex(slug, "i"));
+            hotelCriteria = hotelCriteria.andOperator(cityCriteria);
         }
         if (roomType != null || minPrice != null || maxPrice != null) {
             if (matchingHotelIds.isEmpty()) {
@@ -157,16 +168,16 @@ public class HotelService {
         User owner = userRepository.findByEmail(ownerEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        GeoLocation location = null;
-        if (request.getLongitude() != null && request.getLatitude() != null) {
-            location = GeoLocation.of(request.getLongitude(), request.getLatitude());
-        }
+        GeoLocation location = resolveLocation(
+                request.getLongitude(), request.getLatitude(),
+                request.getAddress(), request.getCity());
 
         Hotel hotel = Hotel.builder()
                 .ownerId(owner.getId())
                 .name(request.getName())
                 .address(request.getAddress())
                 .city(request.getCity())
+                .citySlug(CityUtils.normalize(request.getCity()))
                 .description(request.getDescription())
                 .amenities(request.getAmenities() != null ? request.getAmenities() : List.of())
                 .images(request.getImages() != null ? request.getImages() : List.of())
@@ -197,12 +208,20 @@ public class HotelService {
 
         if (request.getName() != null) hotel.setName(request.getName());
         if (request.getAddress() != null) hotel.setAddress(request.getAddress());
-        if (request.getCity() != null) hotel.setCity(request.getCity());
+        if (request.getCity() != null) {
+            hotel.setCity(request.getCity());
+            hotel.setCitySlug(CityUtils.normalize(request.getCity()));
+        }
         if (request.getDescription() != null) hotel.setDescription(request.getDescription());
         if (request.getAmenities() != null) hotel.setAmenities(request.getAmenities());
         if (request.getImages() != null) hotel.setImages(request.getImages());
         if (request.getLongitude() != null && request.getLatitude() != null) {
             hotel.setLocation(GeoLocation.of(request.getLongitude(), request.getLatitude()));
+        } else if (request.getAddress() != null || request.getCity() != null) {
+            String addr = request.getAddress() != null ? request.getAddress() : hotel.getAddress();
+            String city = request.getCity()    != null ? request.getCity()    : hotel.getCity();
+            geocodingService.geocode(addr, city)
+                    .ifPresent(c -> hotel.setLocation(GeoLocation.of(c[0], c[1])));
         }
         hotel.setUpdatedAt(LocalDateTime.now());
 
@@ -266,6 +285,50 @@ public class HotelService {
         hotel.setUpdatedAt(LocalDateTime.now());
 
         return toResponse(hotelRepository.save(hotel));
+    }
+
+    public List<NearbyHotelResponse> getNearbyHotels(double lat, double lng,
+                                                       double radiusKm, int limit) {
+        // Point(x, y) = Point(longitude, latitude) — thứ tự GeoJSON
+        NearQuery nearQuery = NearQuery
+                .near(new Point(lng, lat), Metrics.KILOMETERS)
+                .maxDistance(radiusKm)
+                .spherical(true)
+                .limit(limit)
+                .query(Query.query(Criteria.where("status").is(HotelStatus.APPROVED)));
+
+        return mongoTemplate.geoNear(nearQuery, Hotel.class)
+                .getContent()
+                .stream()
+                .map(r -> toNearbyResponse(r.getContent(), r.getDistance().getValue()))
+                .toList();
+    }
+
+    private NearbyHotelResponse toNearbyResponse(Hotel hotel, double distanceKm) {
+        return NearbyHotelResponse.builder()
+                .id(hotel.getId())
+                .name(hotel.getName())
+                .address(hotel.getAddress())
+                .city(hotel.getCity())
+                .description(hotel.getDescription())
+                .location(hotel.getLocation())
+                .amenities(hotel.getAmenities())
+                .images(hotel.getImages())
+                .status(hotel.getStatus())
+                .avgRating(hotel.getAvgRating())
+                .reviewCount(hotel.getReviewCount())
+                .distanceKm(Math.round(distanceKm * 100.0) / 100.0)
+                .build();
+    }
+
+    private GeoLocation resolveLocation(Double longitude, Double latitude, String address, String city) {
+        if (longitude != null && latitude != null) {
+            return GeoLocation.of(longitude, latitude);
+        }
+        return geocodingService.geocode(
+                address != null ? address : "",
+                city    != null ? city    : ""
+        ).map(c -> GeoLocation.of(c[0], c[1])).orElse(null);
     }
 
     private RoomResponse toRoomResponse(Room room) {

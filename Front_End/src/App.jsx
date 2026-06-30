@@ -26,6 +26,7 @@ import StaffCheckInPage from './pages/staff/StaffCheckInPage';
 import StaffCheckOutPage from './pages/staff/StaffCheckOutPage';
 import ChatPage from './pages/ChatPage';
 import MessagesPage from './pages/MessagesPage';
+import SearchPage from './pages/SearchPage';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
 
         {/* ── Public (không cần login) ── */}
         <Route path="/" element={<HomePage />} />
+        <Route path="/search" element={<SearchPage />} />
         <Route path="/hotels" element={<div className="flex items-center justify-center min-h-screen text-2xl">Danh sách Hotel</div>} />
         <Route path="/hotels/:id" element={<HotelDetailPage />} />
         <Route path="/login" element={<LoginPage />} />

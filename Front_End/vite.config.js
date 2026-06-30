@@ -14,4 +14,8 @@ export default defineConfig({
     // sockjs-client dùng biến global của Node — polyfill cho browser
     global: 'globalThis',
   },
+  optimizeDeps: {
+    // Leaflet dùng CJS — cần pre-bundle để Vite không lỗi ESM/CJS mismatch
+    include: ['leaflet', 'react-leaflet'],
+  },
 })

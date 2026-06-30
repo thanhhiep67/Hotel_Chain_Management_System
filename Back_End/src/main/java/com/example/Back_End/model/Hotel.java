@@ -41,6 +41,10 @@ public class Hotel {
     @Indexed
     private String city;
 
+    /** Normalized (no-accent, lowercase) version of city for fuzzy search */
+    @Indexed
+    private String citySlug;
+
     private String description;
 
     @GeoSpatialIndexed(type = GeoSpatialIndexType.GEO_2DSPHERE)

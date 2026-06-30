@@ -564,7 +564,7 @@ export default function ReviewSection({ hotelId, avgRating = 0, reviewCount = 0 
                 ${starFilter === s
                   ? 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
-              {s === null ? 'Tất cả' : `${'★'.repeat(s)} ${s} sao`}
+              {s === null ? 'Tất cả' : '★'.repeat(s)}
             </button>
           ))}
         </div>

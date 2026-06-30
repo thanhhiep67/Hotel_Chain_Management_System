@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { searchHotels, getPlatformStats, getCityCounts } from '../api/hotels';
+import { getHybridRecommendations } from '../api/recommendations';
 
 const HERO_IMG = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1920&q=85';
-import { searchHotels } from '../api/hotels';
-import { getHybridRecommendations } from '../api/recommendations';
 
 /* ─── constants (unchanged) ─────────────────────────────────── */
 const ROOM_TYPES      = ['STANDARD','DELUXE','SUITE','FAMILY'];
@@ -141,16 +141,76 @@ const GLOBAL_CSS = `
   .search-input::placeholder { color:rgba(242,240,235,0.45); }
   .search-input::-webkit-calendar-picker-indicator { filter:invert(0.6); cursor:pointer; }
   .search-btn {
-    flex-shrink:0; padding:14px 28px; margin:0;
-    background:var(--c-gold);
-    color:#0A0A0B; font-family:var(--font-body);
-    font-size:13px; font-weight:600; letter-spacing:0.04em;
-    border:none; border-radius:12px; cursor:pointer;
-    transition:var(--transition);
-    white-space:nowrap;
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 34px; margin: 5px 5px 5px 2px;
+    align-self: stretch;
+    background: linear-gradient(145deg, #D9B44A 0%, #C9A84C 55%, #B89036 100%);
+    color: #1a1100;
+    font-family: var(--font-body);
+    font-size: 14px; font-weight: 700; letter-spacing: 0.03em;
+    border: none; border-radius: 11px; cursor: pointer;
+    transition: var(--transition); white-space: nowrap;
+    box-shadow: 0 2px 0 #9A7028, 0 4px 20px rgba(201,168,76,0.28);
+    position: relative; overflow: hidden;
   }
-  .search-btn:hover { background:#e0bc5e; transform:translateY(-1px); box-shadow:0 6px 20px rgba(201,168,76,0.35); }
-  .search-btn:active { transform:translateY(0); }
+  .search-btn::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.14) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .search-btn:hover {
+    background: linear-gradient(145deg, #E8C254 0%, #D9B44A 55%, #C9A04A 100%);
+    box-shadow: 0 2px 0 #9A7028, 0 8px 32px rgba(201,168,76,0.48);
+    transform: translateY(-1px);
+  }
+  .search-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 0 #9A7028, 0 2px 10px rgba(201,168,76,0.22);
+  }
+
+  .search-map-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 50px;
+    color: rgba(242,240,235,0.65);
+    font-family: var(--font-body); font-size: 12.5px; font-weight: 500;
+    cursor: pointer; transition: var(--transition); white-space: nowrap;
+  }
+  .search-map-btn:hover {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(201,168,76,0.38);
+    color: var(--c-gold);
+  }
+
+  .nearby-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px;
+    background: rgba(201,168,76,0.14);
+    border: 1px solid rgba(201,168,76,0.35);
+    border-radius: 50px;
+    color: var(--c-gold);
+    font-family: var(--font-body); font-size: 12.5px; font-weight: 600;
+    cursor: pointer; transition: var(--transition); white-space: nowrap;
+  }
+  .nearby-btn:hover:not(:disabled) {
+    background: rgba(201,168,76,0.24);
+    border-color: rgba(201,168,76,0.65);
+    box-shadow: 0 0 0 3px rgba(201,168,76,0.12);
+  }
+  .nearby-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .nearby-btn.nearby-err {
+    color: #ff6b6b; border-color: rgba(255,107,107,0.5);
+    background: rgba(255,107,107,0.1);
+  }
+  @keyframes nearby-spin { to { transform: rotate(360deg); } }
+  .nearby-spin {
+    width: 13px; height: 13px; border-radius: 50%;
+    border: 2px solid currentColor; border-top-color: transparent;
+    animation: nearby-spin .75s linear infinite; flex-shrink: 0;
+  }
 
   /* ── stats ── */
   .stats-bar {
@@ -432,6 +492,72 @@ const GLOBAL_CSS = `
   .rec-arrow { font-size:16px; color:var(--c-subtle); transition:var(--transition); }
   .rec-card:hover .rec-arrow { color:var(--c-gold); }
 
+  /* ── autocomplete ── */
+  .city-field-wrap { position:relative; flex:1; display:flex; flex-direction:column; padding:14px 20px; cursor:text; border-right:1px solid var(--c-border); border-radius:12px; transition:background 0.15s; }
+  .city-field-wrap:hover { background:rgba(255,255,255,0.04); }
+  .autocomplete-drop {
+    position:absolute; top:calc(100% + 8px); left:-6px; right:-6px; z-index:200;
+    background:rgba(18,18,22,0.97); border:1px solid var(--c-border2);
+    border-radius:12px; overflow:hidden;
+    box-shadow:0 16px 48px rgba(0,0,0,0.6);
+    backdrop-filter:blur(20px);
+  }
+  .autocomplete-item {
+    padding:11px 18px; display:flex; align-items:center; gap:10px;
+    cursor:pointer; transition:background 0.1s; font-size:13px; color:#F2F0EB;
+  }
+  .autocomplete-item:hover, .autocomplete-item.active { background:rgba(201,168,76,0.12); }
+  .autocomplete-pin { font-size:14px; opacity:0.5; }
+  .autocomplete-name { font-weight:500; flex:1; }
+  .autocomplete-count { font-size:11px; color:rgba(242,240,235,0.35); }
+
+  /* ── nights badge ── */
+  .nights-badge {
+    display:inline-flex; align-items:center; gap:4px;
+    background:rgba(201,168,76,0.15); color:var(--c-gold);
+    font-size:10px; font-weight:600; letter-spacing:0.05em;
+    padding:2px 9px; border-radius:20px; margin-top:4px; width:fit-content;
+  }
+
+  /* ── guests field ── */
+  .guests-wrap { display:flex; align-items:center; gap:8px; margin-top:5px; }
+  .guests-btn {
+    width:22px; height:22px; border-radius:50%;
+    background:rgba(255,255,255,0.08); border:1px solid var(--c-border2);
+    color:#F2F0EB; font-size:14px; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:var(--transition); flex-shrink:0;
+  }
+  .guests-btn:hover { background:rgba(201,168,76,0.2); border-color:var(--c-gold-dim); }
+  .guests-val { font-size:13.5px; font-weight:400; color:#F2F0EB; min-width:16px; text-align:center; }
+
+  /* ── sort ── */
+  .sort-wrap { display:flex; align-items:center; gap:6px; margin-left:auto; }
+  .sort-label { font-size:11px; color:var(--c-subtle); white-space:nowrap; }
+  .sort-select {
+    background:transparent; border:1px solid var(--c-border);
+    color:var(--c-text); font-family:var(--font-body); font-size:12px;
+    padding:5px 10px; border-radius:7px; outline:none; cursor:pointer;
+    transition:var(--transition);
+  }
+  .sort-select:focus { border-color:var(--c-gold-dim); }
+  .sort-select option { background:#fff; color:#1C1B18; }
+
+  /* ── count-up ── */
+  @keyframes statIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+  .stat-value.animating { animation:statIn 0.4s ease both; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+
+  /* ── empty city chips ── */
+  .empty-cities { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:20px; }
+  .empty-city-chip {
+    padding:7px 18px; background:var(--c-surface); border:1px solid var(--c-border);
+    border-radius:20px; font-size:12px; color:var(--c-muted); cursor:pointer;
+    transition:var(--transition); font-family:var(--font-body);
+  }
+  .empty-city-chip:hover { border-color:var(--c-gold-dim); color:var(--c-gold); background:rgba(201,168,76,0.06); }
+
   /* ─ responsive ─ */
   @media(max-width:900px) {
     .stats-inner { grid-template-columns:repeat(2,1fr); }
@@ -466,13 +592,19 @@ function StarRating({ rating }) {
 }
 
 /* ─── HotelCard ──────────────────────────────────────────────── */
-function HotelCard({ hotel, checkIn, checkOut }) {
+function HotelCard({ hotel, checkIn, checkOut, isHighlighted, onHover, onLeave, cardRef }) {
   const navigate = useNavigate();
   const img   = hotel.images?.[0];
   const score = hotel.avgRating > 0 ? (hotel.avgRating * 2).toFixed(1) : null;
 
   return (
-    <div className="hotel-card" onClick={() => navigate(`/hotels/${hotel.id}`, { state: { checkIn, checkOut } })}>
+    <div
+      ref={cardRef}
+      className={`hotel-card${isHighlighted ? ' map-highlighted' : ''}`}
+      onClick={() => navigate(`/hotels/${hotel.id}`, { state: { checkIn, checkOut } })}
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
+    >
       <div className="hotel-img-wrap">
         {img
           ? <img src={img} alt={hotel.name} className="hotel-img" />
@@ -569,6 +701,7 @@ function Pagination({ page, totalPages, onPageChange }) {
 
 /* ════════════════ Main Page ════════════════ */
 export default function HomePage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user')); } catch { return null; } })();
@@ -595,6 +728,29 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [geoState, setGeoState] = useState(null); // null | 'loading' | 'error'
+
+  const handleFindNearby = () => {
+    if (!navigator.geolocation) {
+      setGeoState('error');
+      setTimeout(() => setGeoState(null), 3000);
+      return;
+    }
+    setGeoState('loading');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoState(null);
+        const { latitude: lat, longitude: lng } = pos.coords;
+        navigate(`/search?nearby=true&lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
+      },
+      () => {
+        setGeoState('error');
+        setTimeout(() => setGeoState(null), 3000);
+      },
+      { timeout: 10000 }
+    );
+  };
+
   const [filters, setFilters] = useState({
     city:     searchParams.get('city')     ?? '',
     checkIn:  searchParams.get('checkIn')  ?? '',
@@ -610,6 +766,78 @@ export default function HomePage() {
   const [totalElements, setTotalElements] = useState(0);
   const [loading,       setLoading]       = useState(false);
   const [searched,      setSearched]      = useState(false);
+  const [stats,         setStats]         = useState(null);
+  const [cityCounts,    setCityCounts]    = useState({});
+  const [sortBy,        setSortBy]        = useState('rating');
+  const [showCityDrop,  setShowCityDrop]  = useState(false);
+  const [statsAnimated, setStatsAnimated] = useState(false);
+  const [displayStats,  setDisplayStats]  = useState(null);
+  const resultsRef  = useRef(null);
+  const statsBarRef = useRef(null);
+
+  // normalize helper for autocomplete matching
+  const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d');
+
+  // city autocomplete suggestions
+  const citySuggestions = useMemo(() => {
+    const q = norm(draft.city);
+    if (!q) return [];
+    return POPULAR_CITIES.filter(c => norm(c.name).includes(q));
+  }, [draft.city]);
+
+  // nights between check-in and check-out
+  const nights = useMemo(() => {
+    if (!draft.checkIn || !draft.checkOut) return 0;
+    const diff = new Date(draft.checkOut) - new Date(draft.checkIn);
+    return Math.max(0, Math.round(diff / 86400000));
+  }, [draft.checkIn, draft.checkOut]);
+
+  // sorted hotels (client-side, current page)
+  const sortedHotels = useMemo(() => {
+    const arr = [...hotels];
+    if (sortBy === 'price_asc')  return arr.sort((a,b) => (a.minPrice||Infinity) - (b.minPrice||Infinity));
+    if (sortBy === 'price_desc') return arr.sort((a,b) => (b.minPrice||0) - (a.minPrice||0));
+    if (sortBy === 'reviews')    return arr.sort((a,b) => (b.reviewCount||0) - (a.reviewCount||0));
+    return arr.sort((a,b) => (b.avgRating||0) - (a.avgRating||0)); // default: rating
+  }, [hotels, sortBy]);
+
+  // count-up animation when stats bar enters viewport
+  useEffect(() => {
+    if (!stats || statsAnimated) return;
+    const el = statsBarRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      obs.disconnect();
+      setStatsAnimated(true);
+      const duration = 1400;
+      const start = Date.now();
+      const tick = () => {
+        const t = Math.min((Date.now() - start) / duration, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        setDisplayStats({
+          totalHotels:  Math.round(stats.totalHotels  * ease),
+          totalRooms:   Math.round(stats.totalRooms   * ease),
+          totalGuests:  Math.round(stats.totalGuests  * ease),
+          avgRating:    Math.round(stats.avgRating    * ease * 10) / 10,
+        });
+        if (t < 1) requestAnimationFrame(tick);
+        else setDisplayStats(stats);
+      };
+      requestAnimationFrame(tick);
+    }, { threshold: 0.4 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [stats, statsAnimated]);
+
+  useEffect(() => {
+    getPlatformStats()
+      .then(res => setStats(res.data.data))
+      .catch(() => {});
+    getCityCounts(POPULAR_CITIES.map(c => c.name))
+      .then(res => setCityCounts(res.data.data))
+      .catch(() => {});
+  }, []);
 
   const fetchHotels = useCallback(async (f, p) => {
     setLoading(true);
@@ -631,6 +859,10 @@ export default function HomePage() {
 
   useEffect(() => { fetchHotels(filters, page); }, [filters, page, fetchHotels]);
 
+  const scrollToResults = () => {
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
     setFilters(draft); setPage(0);
@@ -642,12 +874,14 @@ export default function HomePage() {
     if (draft.minPrice) p.minPrice = draft.minPrice;
     if (draft.maxPrice) p.maxPrice = draft.maxPrice;
     setSearchParams(p);
+    setTimeout(scrollToResults, 100);
   };
 
   const handleCitySelect = (cityName) => {
     const updated = { ...draft, city: cityName };
     setDraft(updated); setFilters(updated); setPage(0);
     setSearchParams({ city: cityName });
+    setTimeout(scrollToResults, 100);
   };
 
   const clearFilters = () => {
@@ -691,33 +925,134 @@ export default function HomePage() {
             {/* Search */}
             <form onSubmit={handleSearch}>
               <div className="search-box">
-                <div className="search-field">
+
+                {/* Điểm đến + autocomplete */}
+                <div className="city-field-wrap">
                   <label className="search-label">Điểm đến</label>
                   <input className="search-input" type="text" placeholder="Thành phố, khách sạn..."
-                    value={draft.city} onChange={e => setDraft(p => ({ ...p, city: e.target.value }))} />
+                    value={draft.city}
+                    onChange={e => { setDraft(p => ({ ...p, city: e.target.value })); setShowCityDrop(true); }}
+                    onFocus={() => draft.city && setShowCityDrop(true)}
+                    onBlur={() => setTimeout(() => setShowCityDrop(false), 150)}
+                    autoComplete="off"
+                  />
+                  {showCityDrop && citySuggestions.length > 0 && (
+                    <div className="autocomplete-drop">
+                      {citySuggestions.map(c => (
+                        <div key={c.name} className="autocomplete-item"
+                          onMouseDown={() => { setDraft(p => ({ ...p, city: c.name })); setShowCityDrop(false); }}>
+                          <span className="autocomplete-pin">📍</span>
+                          <span className="autocomplete-name">{c.name}</span>
+                          <span className="autocomplete-count">{cityCounts[c.name] ?? c.count} KS</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
+                {/* Nhận phòng */}
                 <div className="search-field">
                   <label className="search-label">Nhận phòng</label>
                   <input className="search-input" type="date" min={today}
                     value={draft.checkIn} onChange={e => setDraft(p => ({ ...p, checkIn: e.target.value }))} />
                 </div>
+
+                {/* Trả phòng + số đêm */}
                 <div className="search-field">
                   <label className="search-label">Trả phòng</label>
                   <input className="search-input" type="date" min={draft.checkIn || tomorrow}
                     value={draft.checkOut} onChange={e => setDraft(p => ({ ...p, checkOut: e.target.value }))} />
+                  {nights > 0 && <span className="nights-badge">🌙 {nights} đêm</span>}
                 </div>
-                <button type="submit" className="search-btn">Tìm kiếm</button>
+
+                {/* Số khách */}
+                <div className="search-field" style={{borderRight:'none'}}>
+                  <label className="search-label">Số khách</label>
+                  <div className="guests-wrap">
+                    <button type="button" className="guests-btn"
+                      onClick={() => setDraft(p => ({ ...p, guests: Math.max(1, (p.guests||1) - 1) }))}>−</button>
+                    <span className="guests-val">{draft.guests || 1}</span>
+                    <button type="button" className="guests-btn"
+                      onClick={() => setDraft(p => ({ ...p, guests: Math.min(10, (p.guests||1) + 1) }))}>+</button>
+                    <span style={{fontSize:'12px',color:'rgba(242,240,235,0.5)',marginLeft:'2px'}}>người</span>
+                  </div>
+                </div>
+
+                {/* Submit — icon + text */}
+                <button type="submit" className="search-btn">
+                  <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.5"
+                    strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  Tìm kiếm
+                </button>
+              </div>
+
+              {/* Bản đồ + Tìm gần tôi — below search box */}
+              <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  type="button"
+                  className="search-map-btn"
+                  onClick={() => {
+                    const p = new URLSearchParams();
+                    if (draft.city)     p.set('city',     draft.city);
+                    if (draft.checkIn)  p.set('checkIn',  draft.checkIn);
+                    if (draft.checkOut) p.set('checkOut', draft.checkOut);
+                    if (draft.type)     p.set('type',     draft.type);
+                    if (draft.minPrice) p.set('minPrice', draft.minPrice);
+                    if (draft.maxPrice) p.set('maxPrice', draft.maxPrice);
+                    navigate(`/search?${p.toString()}`);
+                  }}
+                >
+                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"
+                    strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                  </svg>
+                  Xem trên bản đồ
+                </button>
+
+                <button
+                  type="button"
+                  className={`nearby-btn${geoState === 'error' ? ' nearby-err' : ''}`}
+                  disabled={geoState === 'loading'}
+                  onClick={handleFindNearby}
+                >
+                  {geoState === 'loading' ? (
+                    <span className="nearby-spin" />
+                  ) : geoState === 'error' ? (
+                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"
+                      strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+                      <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                  ) : (
+                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"
+                      strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
+                    </svg>
+                  )}
+                  {geoState === 'loading' ? 'Đang định vị…'
+                    : geoState === 'error' ? 'Không thể định vị'
+                    : 'Tìm gần tôi'}
+                </button>
               </div>
             </form>
           </div>
         </section>
 
         {/* ══ STATS ═════════════════════════════════════════ */}
-        <div className="stats-bar">
+        <div className="stats-bar" ref={statsBarRef}>
           <div className="stats-inner">
-            {STATS.map(s => (
+            {(displayStats ? [
+              { value: displayStats.totalHotels.toLocaleString('vi-VN') + '+', label: 'Khách sạn' },
+              { value: displayStats.totalRooms.toLocaleString('vi-VN')  + '+', label: 'Phòng nghỉ' },
+              { value: displayStats.totalGuests.toLocaleString('vi-VN') + '+', label: 'Lượt khách' },
+              { value: displayStats.avgRating > 0 ? displayStats.avgRating.toFixed(1) + '/5' : '—', label: 'Điểm đánh giá' },
+            ] : STATS).map(s => (
               <div key={s.label} className="stat-item">
-                <div className="stat-value">{s.value}</div>
+                <div className={`stat-value${statsAnimated ? ' animating' : ''}`}>{s.value}</div>
                 <div className="stat-label">{s.label}</div>
               </div>
             ))}
@@ -778,7 +1113,7 @@ export default function HomePage() {
                   <div className="city-overlay" />
                   <div className="city-text">
                     <div className="city-name">{city.name}</div>
-                    <div className="city-count">{city.count} khách sạn</div>
+                    <div className="city-count">{cityCounts[city.name] ?? city.count} khách sạn</div>
                   </div>
                 </button>
               ))}
@@ -787,7 +1122,7 @@ export default function HomePage() {
         </div>
 
         {/* ══ FILTER BAR ════════════════════════════════════ */}
-        <div style={{marginTop:'48px'}}>
+        <div ref={resultsRef} style={{marginTop:'48px'}}>
           <div className="filter-bar">
             <div className="filter-inner">
               <select className="filter-select" value={draft.type}
@@ -813,27 +1148,35 @@ export default function HomePage() {
               {totalElements > 0 && (
                 <span className="filter-count">{totalElements} khách sạn</span>
               )}
+
+              <div className="sort-wrap">
+                <span className="sort-label">Sắp xếp:</span>
+                <select className="sort-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                  <option value="rating">Đánh giá cao</option>
+                  <option value="price_asc">Giá thấp → cao</option>
+                  <option value="price_desc">Giá cao → thấp</option>
+                  <option value="reviews">Nhiều đánh giá</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ══ HOTEL GRID ════════════════════════════════════ */}
+        {/* ══ HOTEL GRID / MAP ══════════════════════════════ */}
         <div style={{padding:'48px 0 0'}}>
           <div className="section">
-            <div className="section-header" style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between'}}>
-              <div>
-                <div className="section-eyebrow">
-                  {filters.city ? `Kết quả tại "${filters.city}"` : 'Nổi bật'}
-                </div>
-                <div className="section-title">
-                  {filters.city ? `Khách sạn tại ${filters.city}` : 'Khách sạn nổi bật'}
-                </div>
-                {searched && !loading && totalElements > 0 && (
-                  <p style={{fontSize:'13px',color:'var(--c-muted)',marginTop:'6px'}}>
-                    {totalElements} kết quả
-                  </p>
-                )}
+            <div className="section-header">
+              <div className="section-eyebrow">
+                {filters.city ? `Kết quả tại "${filters.city}"` : 'Nổi bật'}
               </div>
+              <div className="section-title">
+                {filters.city ? `Khách sạn tại ${filters.city}` : 'Khách sạn nổi bật'}
+              </div>
+              {searched && !loading && totalElements > 0 && (
+                <p style={{fontSize:'13px',color:'var(--c-muted)',marginTop:'6px'}}>
+                  {totalElements} kết quả
+                </p>
+              )}
             </div>
 
             {/* Skeleton */}
@@ -852,10 +1195,10 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Grid */}
-            {!loading && hotels.length > 0 && (
+            {/* Grid view */}
+            {!loading && sortedHotels.length > 0 && (
               <div className="hotels-grid">
-                {hotels.map(hotel => (
+                {sortedHotels.map(hotel => (
                   <HotelCard key={hotel.id} hotel={hotel} checkIn={filters.checkIn} checkOut={filters.checkOut} />
                 ))}
               </div>
@@ -866,8 +1209,16 @@ export default function HomePage() {
               <div className="empty-state">
                 <div className="empty-glyph">✦</div>
                 <div className="empty-title">Không tìm thấy khách sạn</div>
-                <div className="empty-sub">Thử thay đổi bộ lọc hoặc tìm kiếm thành phố khác</div>
-                <button className="empty-btn" onClick={clearFilters}>Xóa bộ lọc</button>
+                <div className="empty-sub">Thử thay đổi bộ lọc hoặc tìm kiếm ở thành phố khác</div>
+                <div className="empty-cities">
+                  {POPULAR_CITIES.map(c => (
+                    <button key={c.name} className="empty-city-chip"
+                      onClick={() => handleCitySelect(c.name)}>
+                      📍 {c.name}
+                    </button>
+                  ))}
+                </div>
+                <button className="empty-btn" style={{marginTop:'24px'}} onClick={clearFilters}>Xóa bộ lọc</button>
               </div>
             )}
 

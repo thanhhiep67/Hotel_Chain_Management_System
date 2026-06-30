@@ -6,6 +6,7 @@ import com.example.Back_End.dto.request.UpdateHotelStatusRequest;
 import com.example.Back_End.dto.response.ApiResponse;
 import com.example.Back_End.dto.response.HotelDetailResponse;
 import com.example.Back_End.dto.response.HotelResponse;
+import com.example.Back_End.dto.response.NearbyHotelResponse;
 import com.example.Back_End.dto.response.PageResponse;
 import com.example.Back_End.model.enums.HotelStatus;
 import com.example.Back_End.model.enums.RoomType;
@@ -37,6 +38,19 @@ public class HotelController {
                 .statusCode(HttpStatus.OK.value())
                 .message("Hotel updated successfully")
                 .data(hotelService.updateHotel(id, email, role, request))
+                .build());
+    }
+
+    @GetMapping("/nearby")
+    public ResponseEntity<ApiResponse<List<NearbyHotelResponse>>> getNearbyHotels(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "10") double radiusKm,
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(ApiResponse.<List<NearbyHotelResponse>>builder()
+                .statusCode(HttpStatus.OK.value())
+                .message("Success")
+                .data(hotelService.getNearbyHotels(lat, lng, radiusKm, limit))
                 .build());
     }
 

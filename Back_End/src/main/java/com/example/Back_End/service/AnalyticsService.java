@@ -62,7 +62,7 @@ public class AnalyticsService {
 
     // ── 1. Tổng quan (current month + all-time) ───────────────────────────
 
-    @Cacheable(value = "analytics:overview", key = "#hotelId")
+    @Cacheable(value = "analytics:overview", key = "#hotelId + ':' + T(java.time.YearMonth).now().toString()")
     public OverviewResponse getOverview(String ownerEmail, String hotelId) {
         Hotel hotel = getHotelForOwner(ownerEmail, hotelId);
 
