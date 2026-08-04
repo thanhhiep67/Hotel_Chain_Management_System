@@ -1,6 +1,9 @@
 package com.example.Back_End.controller;
 
 import com.example.Back_End.service.ReportService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
@@ -13,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 
+@Tag(name = "Reports (OWNER)", description = "Xuất báo cáo Excel theo khoảng thời gian")
 @RestController
 @RequestMapping("/reports")
 @RequiredArgsConstructor
@@ -21,10 +25,7 @@ public class ReportController {
 
     private final ReportService reportService;
 
-    /**
-     * GET /reports/export?hotelId=&from=2024-01-01&to=2024-12-31
-     * Trả về file .xlsx
-     */
+    @Operation(summary = "Xuất báo cáo doanh thu ra file .xlsx (OWNER)", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportExcel(
             @RequestParam String hotelId,

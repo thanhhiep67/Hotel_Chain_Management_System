@@ -7,6 +7,10 @@ import com.example.Back_End.dto.response.PageResponse;
 import com.example.Back_End.dto.response.ThreadSummaryResponse;
 import com.example.Back_End.service.MessageService;
 import com.example.Back_End.service.PresenceService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Messages", description = "Chat khách – khách sạn · inbox · upload ảnh")
 @RestController
 @RequestMapping("/messages")
 @RequiredArgsConstructor
@@ -26,7 +31,7 @@ public class MessageController {
     private final MessageService  messageService;
     private final PresenceService presenceService;
 
-    /** Thông tin header của 1 thread (tên khách / tên khách sạn) */
+    @Operation(summary = "Thông tin header của một thread chat", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/thread-info/{threadId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ThreadSummaryResponse>> getThreadInfo(
@@ -39,7 +44,7 @@ public class MessageController {
                 .build());
     }
 
-    /** Danh sách hội thoại (inbox) — có phân trang */
+    @Operation(summary = "Danh sách hội thoại (inbox) có phân trang", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/threads")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<PageResponse<ThreadSummaryResponse>>> getThreads(
@@ -53,14 +58,14 @@ public class MessageController {
                 .build());
     }
 
-    /** Lịch sử chat theo thread — có tìm kiếm keyword */
+    @Operation(summary = "Lịch sử chat theo thread — hỗ trợ tìm kiếm từ khóa", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/{threadId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<PageResponse<MessageResponse>>> getMessages(
             @PathVariable String threadId,
             @RequestParam(defaultValue = "0")   int page,
             @RequestParam(defaultValue = "30")  int size,
-            @RequestParam(required = false)     String keyword,
+            @Parameter(description = "Tìm kiếm theo nội dung tin nhắn") @RequestParam(required = false) String keyword,
             Authentication authentication) {
         String email = (String) authentication.getPrincipal();
         return ResponseEntity.ok(ApiResponse.<PageResponse<MessageResponse>>builder()
@@ -69,7 +74,7 @@ public class MessageController {
                 .build());
     }
 
-    /** Gửi tin nhắn */
+    @Operation(summary = "Gửi tin nhắn", security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<MessageResponse>> sendMessage(
@@ -83,7 +88,7 @@ public class MessageController {
                         .build());
     }
 
-    /** Upload ảnh đính kèm — trả về URL để dùng trong sendMessage */
+    @Operation(summary = "Upload ảnh đính kèm — trả về URL", security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping("/upload-image")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<String>> uploadImage(
@@ -96,7 +101,7 @@ public class MessageController {
                 .build());
     }
 
-    /** Đánh dấu đã đọc toàn bộ thread */
+    @Operation(summary = "Đánh dấu toàn bộ tin nhắn trong thread đã đọc", security = @SecurityRequirement(name = "bearerAuth"))
     @PatchMapping("/{threadId}/read")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Long>> markAsRead(
@@ -109,7 +114,7 @@ public class MessageController {
                 .data(count).build());
     }
 
-    /** Trạng thái online của danh sách userId */
+    @Operation(summary = "Trạng thái online của danh sách userIds", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/online-status")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> getOnlineStatus(

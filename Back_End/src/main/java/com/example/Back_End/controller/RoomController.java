@@ -6,6 +6,10 @@ import com.example.Back_End.dto.response.DateRangeResponse;
 import com.example.Back_End.dto.response.RoomResponse;
 import com.example.Back_End.model.enums.RoomType;
 import com.example.Back_End.service.RoomService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -17,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 
+@Tag(name = "Rooms", description = "Phòng khách sạn — tìm kiếm, tạo, cập nhật, xóa")
 @RestController
 @RequestMapping("/rooms")
 @RequiredArgsConstructor
@@ -24,12 +29,13 @@ public class RoomController {
 
     private final RoomService roomService;
 
+    @Operation(summary = "Phòng còn trống theo khoảng ngày (public)")
     @GetMapping("/available")
     public ResponseEntity<ApiResponse<List<RoomResponse>>> getAvailableRooms(
-            @RequestParam String hotelId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut,
-            @RequestParam(required = false) RoomType type) {
+            @Parameter(description = "ID khách sạn", required = true) @RequestParam String hotelId,
+            @Parameter(description = "Ngày nhận phòng (yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
+            @Parameter(description = "Ngày trả phòng (yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut,
+            @Parameter(description = "Lọc theo loại phòng") @RequestParam(required = false) RoomType type) {
         return ResponseEntity.ok(ApiResponse.<List<RoomResponse>>builder()
                 .statusCode(HttpStatus.OK.value())
                 .message("Success")
@@ -37,6 +43,7 @@ public class RoomController {
                 .build());
     }
 
+    @Operation(summary = "Chi tiết phòng theo ID (public)")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<RoomResponse>> getRoomById(@PathVariable String id) {
         return ResponseEntity.ok(ApiResponse.<RoomResponse>builder()
@@ -46,6 +53,7 @@ public class RoomController {
                 .build());
     }
 
+    @Operation(summary = "Các khoảng ngày đã đặt của phòng (public)")
     @GetMapping("/{id}/booked-dates")
     public ResponseEntity<ApiResponse<List<DateRangeResponse>>> getBookedDates(@PathVariable String id) {
         return ResponseEntity.ok(ApiResponse.<List<DateRangeResponse>>builder()
@@ -55,6 +63,7 @@ public class RoomController {
                 .build());
     }
 
+    @Operation(summary = "Tạo phòng mới (OWNER)", security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<RoomResponse>> createRoom(
@@ -69,6 +78,7 @@ public class RoomController {
                         .build());
     }
 
+    @Operation(summary = "Cập nhật thông tin phòng (OWNER)", security = @SecurityRequirement(name = "bearerAuth"))
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<RoomResponse>> updateRoom(
@@ -83,6 +93,7 @@ public class RoomController {
                 .build());
     }
 
+    @Operation(summary = "Xóa phòng (OWNER)", security = @SecurityRequirement(name = "bearerAuth"))
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<Void>> deleteRoom(

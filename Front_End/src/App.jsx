@@ -27,6 +27,7 @@ import StaffCheckOutPage from './pages/staff/StaffCheckOutPage';
 import ChatPage from './pages/ChatPage';
 import MessagesPage from './pages/MessagesPage';
 import SearchPage from './pages/SearchPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 
 function App() {
   return (
@@ -41,7 +42,7 @@ function App() {
         <Route path="/hotels/:id" element={<HotelDetailPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<div className="flex items-center justify-center min-h-screen text-2xl">Quên mật khẩu</div>} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/403" element={<ForbiddenPage />} />
 
         {/* ── USER (cần login) ── */}

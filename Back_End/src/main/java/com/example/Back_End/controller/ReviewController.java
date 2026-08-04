@@ -7,6 +7,10 @@ import com.example.Back_End.dto.response.ApiResponse;
 import com.example.Back_End.dto.response.PageResponse;
 import com.example.Back_End.dto.response.ReviewResponse;
 import com.example.Back_End.service.ReviewService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Reviews", description = "Đánh giá khách sạn — tạo, phản hồi, kiểm duyệt")
 @RestController
 @RequestMapping("/reviews")
 @RequiredArgsConstructor
@@ -21,7 +26,7 @@ public class ReviewController {
 
     private final ReviewService reviewService;
 
-    /** POST /reviews — USER đã CHECKED_OUT mới được tạo */
+    @Operation(summary = "Tạo đánh giá — chỉ khách đã check-out (USER)", security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<ReviewResponse>> createReview(
@@ -37,7 +42,7 @@ public class ReviewController {
                         .build());
     }
 
-    /** PATCH /reviews/{id}/reply — chỉ Owner của hotel đó */
+    @Operation(summary = "Phản hồi đánh giá của khách (OWNER)", security = @SecurityRequirement(name = "bearerAuth"))
     @PatchMapping("/{id}/reply")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<ReviewResponse>> replyToReview(
@@ -53,7 +58,7 @@ public class ReviewController {
                 .build());
     }
 
-    /** PATCH /reviews/{id}/status — chỉ ADMIN; ẩn hoặc khôi phục review */
+    @Operation(summary = "Ẩn / khôi phục đánh giá vi phạm (ADMIN)", security = @SecurityRequirement(name = "bearerAuth"))
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ReviewResponse>> updateStatus(
@@ -67,14 +72,14 @@ public class ReviewController {
                 .build());
     }
 
-    /** GET /reviews/hotel/{hotelId} — public; chỉ APPROVED; sort + phân trang */
+    @Operation(summary = "Danh sách đánh giá của khách sạn (public)")
     @GetMapping("/hotel/{hotelId}")
     public ResponseEntity<ApiResponse<PageResponse<ReviewResponse>>> getHotelReviews(
             @PathVariable String hotelId,
             @RequestParam(defaultValue = "0")       int     page,
             @RequestParam(defaultValue = "10")      int     size,
-            @RequestParam(defaultValue = "newest")  String  sort,
-            @RequestParam(required = false)         Integer rating) {
+            @Parameter(description = "newest | highest | lowest") @RequestParam(defaultValue = "newest") String sort,
+            @Parameter(description = "Lọc theo số sao (1–5)") @RequestParam(required = false) Integer rating) {
         PageResponse<ReviewResponse> data = reviewService.getHotelReviews(hotelId, page, size, sort, rating);
         return ResponseEntity.ok(ApiResponse.<PageResponse<ReviewResponse>>builder()
                 .statusCode(200)

@@ -8,6 +8,10 @@ import com.example.Back_End.dto.response.PageResponse;
 import com.example.Back_End.dto.response.PaymentResponse;
 import com.example.Back_End.model.enums.PaymentStatus;
 import com.example.Back_End.service.PaymentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +25,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Payments", description = "Thanh toán VNPay · tiền mặt · hoàn tiền · lịch sử")
 @RestController
 @RequestMapping("/payments")
 @RequiredArgsConstructor
@@ -29,13 +34,7 @@ public class PaymentController {
     private final PaymentService paymentService;
     private final VNPayProperties vnPayProps;
 
-    // ── create payment URL ────────────────────────────────────────────────────
-
-    /**
-     * POST /payments/create
-     * Body: { bookingId, method, bankCode?, locale? }
-     * Routes to the correct gateway, saves Payment(PENDING), returns paymentUrl.
-     */
+    @Operation(summary = "Tạo payment — hỗ trợ VNPay và tiền mặt (USER)", security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping("/create")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<PaymentResponse>> createPayment(
@@ -45,9 +44,7 @@ public class PaymentController {
 
         String userEmail = (String) authentication.getPrincipal();
         String ipAddr    = resolveClientIp(httpRequest);
-
         PaymentResponse data = paymentService.createPayment(userEmail, request, ipAddr);
-
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.<PaymentResponse>builder()
                         .statusCode(HttpStatus.CREATED.value())
@@ -56,9 +53,7 @@ public class PaymentController {
                         .build());
     }
 
-    /**
-     * POST /payments/vnpay/create  — legacy, delegates to /payments/create.
-     */
+    @Operation(summary = "Tạo payment URL VNPay (USER) — legacy endpoint", security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping("/vnpay/create")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<PaymentResponse>> createVNPayPayment(
@@ -70,10 +65,8 @@ public class PaymentController {
 
         String userEmail = (String) authentication.getPrincipal();
         String ipAddr    = resolveClientIp(request);
-
         PaymentResponse data = paymentService.createVNPayPayment(
                 userEmail, bookingId, ipAddr, bankCode, locale);
-
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.<PaymentResponse>builder()
                         .statusCode(HttpStatus.CREATED.value())
@@ -82,12 +75,7 @@ public class PaymentController {
                         .build());
     }
 
-    // ── VNPay return URL (browser redirect) ───────────────────────────────────
-
-    /**
-     * GET /payments/vnpay/return  — VNPay redirects the user's browser here.
-     * No JWT required. Validates signature, updates DB, then redirects to frontend.
-     */
+    @Operation(summary = "VNPay return URL — browser redirect sau khi thanh toán (public)")
     @GetMapping("/vnpay/return")
     public void vnpayReturn(
             @RequestParam Map<String, String> params,
@@ -95,7 +83,7 @@ public class PaymentController {
 
         Map<String, String> ipnResult = paymentService.processCallback(params);
         boolean success = "00".equals(ipnResult.get("RspCode"))
-                       || "02".equals(ipnResult.get("RspCode")); // 02 = already confirmed = OK
+                       || "02".equals(ipnResult.get("RspCode"));
 
         String paymentId = params.get("vnp_TxnRef");
         String redirectUrl = vnPayProps.getFrontendReturnUrl()
@@ -105,23 +93,17 @@ public class PaymentController {
         response.sendRedirect(redirectUrl);
     }
 
-    // ── VNPay IPN (server-to-server) ──────────────────────────────────────────
-
-    /**
-     * GET /payments/vnpay/ipn  — server-to-server callback from VNPay.
-     * No JWT required. Must return VNPay-spec JSON within 5 seconds.
-     */
+    @Operation(summary = "VNPay IPN — server-to-server callback (public)")
     @GetMapping("/vnpay/ipn")
     public Map<String, String> vnpayIpn(@RequestParam Map<String, String> params) {
         return paymentService.processCallback(params);
     }
 
-    // ── query ─────────────────────────────────────────────────────────────────
-
+    @Operation(summary = "Lịch sử thanh toán của tôi (USER)", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/my-payments")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<PageResponse<PaymentResponse>>> getMyPayments(
-            @RequestParam(required = false) PaymentStatus status,
+            @Parameter(description = "Lọc theo trạng thái") @RequestParam(required = false) PaymentStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             Authentication authentication) {
@@ -134,6 +116,7 @@ public class PaymentController {
                 .build());
     }
 
+    @Operation(summary = "Chi tiết payment theo ID (đã đăng nhập)", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/{paymentId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<PaymentResponse>> getPayment(
@@ -142,7 +125,6 @@ public class PaymentController {
 
         boolean isPrivileged = authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().matches("ROLE_ADMIN|ROLE_OWNER|ROLE_STAFF"));
-
         return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
                 .statusCode(HttpStatus.OK.value())
                 .message("OK")
@@ -150,6 +132,7 @@ public class PaymentController {
                 .build());
     }
 
+    @Operation(summary = "Danh sách payment theo bookingId (đã đăng nhập)", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/booking/{bookingId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> getByBooking(
@@ -162,13 +145,7 @@ public class PaymentController {
                 .build());
     }
 
-    // ── refund ────────────────────────────────────────────────────────────────
-
-    /**
-     * POST /payments/{id}/refund
-     * Gọi VNPay refund API → cập nhật Payment(REFUNDED) + Booking.paymentStatus(REFUNDED).
-     * Chỉ OWNER / ADMIN / STAFF mới được hoàn tiền.
-     */
+    @Operation(summary = "Hoàn tiền qua VNPay (OWNER / ADMIN / STAFF)", security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping("/{id}/refund")
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'STAFF')")
     public ResponseEntity<ApiResponse<PaymentResponse>> refundPayment(
@@ -180,9 +157,7 @@ public class PaymentController {
         String requesterEmail = (String) authentication.getPrincipal();
         String ipAddr         = resolveClientIp(httpRequest);
         String reason         = request != null ? request.getReason() : null;
-
         PaymentResponse data = paymentService.refundPayment(id, requesterEmail, reason, ipAddr);
-
         return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
                 .statusCode(HttpStatus.OK.value())
                 .message("Payment refunded successfully")
@@ -190,12 +165,9 @@ public class PaymentController {
                 .build());
     }
 
-    // ── helper ────────────────────────────────────────────────────────────────
-
     private String resolveClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isBlank()) ip = request.getRemoteAddr();
-        // IPv6 loopback → normalise to 127.0.0.1 for VNPay
         if ("0:0:0:0:0:0:0:1".equals(ip)) ip = "127.0.0.1";
         return ip;
     }

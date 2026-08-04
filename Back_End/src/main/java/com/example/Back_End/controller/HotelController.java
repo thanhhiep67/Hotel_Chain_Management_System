@@ -11,6 +11,10 @@ import com.example.Back_End.dto.response.PageResponse;
 import com.example.Back_End.model.enums.HotelStatus;
 import com.example.Back_End.model.enums.RoomType;
 import com.example.Back_End.service.HotelService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -19,6 +23,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Hotels", description = "Tìm kiếm · tạo · quản lý khách sạn")
 @RestController
 @RequestMapping("/hotels")
 @RequiredArgsConstructor
@@ -26,6 +31,7 @@ public class HotelController {
 
     private final HotelService hotelService;
 
+    @Operation(summary = "Cập nhật thông tin khách sạn (OWNER / ADMIN)", security = @SecurityRequirement(name = "bearerAuth"))
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     public ResponseEntity<ApiResponse<HotelResponse>> updateHotel(
@@ -41,12 +47,13 @@ public class HotelController {
                 .build());
     }
 
+    @Operation(summary = "Tìm khách sạn gần vị trí (public)")
     @GetMapping("/nearby")
     public ResponseEntity<ApiResponse<List<NearbyHotelResponse>>> getNearbyHotels(
-            @RequestParam double lat,
-            @RequestParam double lng,
-            @RequestParam(defaultValue = "10") double radiusKm,
-            @RequestParam(defaultValue = "20") int limit) {
+            @Parameter(description = "Vĩ độ (latitude)") @RequestParam double lat,
+            @Parameter(description = "Kinh độ (longitude)") @RequestParam double lng,
+            @Parameter(description = "Bán kính tìm kiếm (km)", example = "10") @RequestParam(defaultValue = "10") double radiusKm,
+            @Parameter(description = "Số kết quả tối đa", example = "20") @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(ApiResponse.<List<NearbyHotelResponse>>builder()
                 .statusCode(HttpStatus.OK.value())
                 .message("Success")
@@ -54,10 +61,11 @@ public class HotelController {
                 .build());
     }
 
+    @Operation(summary = "Tìm kiếm / lọc danh sách khách sạn (public)")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<HotelResponse>>> searchHotels(
-            @RequestParam(required = false) String city,
-            @RequestParam(required = false) RoomType type,
+            @Parameter(description = "Lọc theo thành phố") @RequestParam(required = false) String city,
+            @Parameter(description = "Lọc theo loại phòng") @RequestParam(required = false) RoomType type,
             @RequestParam(required = false) Double minPrice,
             @RequestParam(required = false) Double maxPrice,
             @RequestParam(defaultValue = "0") int page,
@@ -69,6 +77,7 @@ public class HotelController {
                 .build());
     }
 
+    @Operation(summary = "Gán nhân viên cho khách sạn (OWNER)", security = @SecurityRequirement(name = "bearerAuth"))
     @PatchMapping("/{id}/assign-staff")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<Void>> assignStaff(
@@ -83,6 +92,7 @@ public class HotelController {
                 .build());
     }
 
+    @Operation(summary = "Danh sách khách sạn của tôi (OWNER)", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/my-hotels")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<List<HotelResponse>>> getMyHotels(Authentication authentication) {
@@ -94,6 +104,7 @@ public class HotelController {
                 .build());
     }
 
+    @Operation(summary = "Chi tiết khách sạn theo ID (public)")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<HotelDetailResponse>> getHotelById(@PathVariable String id) {
         return ResponseEntity.ok(ApiResponse.<HotelDetailResponse>builder()
@@ -103,6 +114,7 @@ public class HotelController {
                 .build());
     }
 
+    @Operation(summary = "Xóa / vô hiệu hóa khách sạn (OWNER / ADMIN)", security = @SecurityRequirement(name = "bearerAuth"))
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteHotel(
@@ -117,10 +129,11 @@ public class HotelController {
                 .build());
     }
 
+    @Operation(summary = "Danh sách tất cả khách sạn — có lọc (ADMIN)", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/admin")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResponse<HotelResponse>>> getAllHotelsAdmin(
-            @RequestParam(required = false) HotelStatus status,
+            @Parameter(description = "Lọc theo trạng thái duyệt") @RequestParam(required = false) HotelStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(ApiResponse.<PageResponse<HotelResponse>>builder()
@@ -130,6 +143,7 @@ public class HotelController {
                 .build());
     }
 
+    @Operation(summary = "Duyệt / từ chối khách sạn (ADMIN)", security = @SecurityRequirement(name = "bearerAuth"))
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<HotelResponse>> updateStatus(
@@ -142,6 +156,7 @@ public class HotelController {
                 .build());
     }
 
+    @Operation(summary = "Tạo khách sạn mới — chờ Admin duyệt (OWNER)", security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<HotelResponse>> createHotel(

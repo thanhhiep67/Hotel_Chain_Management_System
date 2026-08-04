@@ -1,150 +1,95 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { getPaymentById } from '../api/payments';
 
-/* ─── helpers ───────────────────────────────────────────────────── */
-const fmtVnd = n => n != null ? n.toLocaleString('vi-VN') + ' ₫' : '—';
-const fmtDt  = s => {
-  if (!s) return '—';
-  const d = new Date(s);
-  return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+// ── helpers ────────────────────────────────────────────────────────────────
+
+const fmtVnd = n =>
+  n != null ? Number(n).toLocaleString('vi-VN') + ' ₫' : null;
+
+const fmtDt = s => {
+  if (!s) return null;
+  return new Date(s).toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 };
-const METHOD_LABEL = { VNPAY: 'VNPay', CASH: 'Tiền mặt', MOMO: 'MoMo', ZALOPAY: 'ZaloPay', CREDIT_CARD: 'Thẻ tín dụng', DEBIT_CARD: 'Thẻ ghi nợ', BANK_TRANSFER: 'Chuyển khoản' };
 
-/* ─── CSS ────────────────────────────────────────────────────────── */
-const CSS = `
-  :root {
-    --c-bg:#F7F6F4; --c-card:#FFFFFF; --c-border:rgba(0,0,0,0.08);
-    --c-border2:rgba(0,0,0,0.13); --c-gold:#C9A84C; --c-gold-d:#8A6E30;
-    --c-text:#1C1B18; --c-muted:#6B6860; --c-subtle:#A09D96;
-    --r:14px; --t:all 0.22s cubic-bezier(0.4,0,0.2,1);
-    --font-d:'Cormorant Garamond',Georgia,serif;
-    --font-b:'Outfit',system-ui,sans-serif;
-  }
-  .pr-root { background:var(--c-bg); color:var(--c-text); font-family:var(--font-b); font-size:14px; min-height:100vh; }
-  .pr-wrap { max-width:520px; margin:0 auto; padding:48px 20px 80px; }
+const METHOD_LABEL = {
+  VNPAY: 'VNPay', MOMO: 'MoMo', ZALOPAY: 'ZaloPay',
+  CASH: 'Tiền mặt', CREDIT_CARD: 'Thẻ tín dụng',
+  DEBIT_CARD: 'Thẻ ghi nợ', BANK_TRANSFER: 'Chuyển khoản',
+};
 
-  /* card */
-  .pr-card { background:var(--c-card); border:1px solid var(--c-border); border-radius:20px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.07); }
+// ── variant config (thay đổi màu sắc theo status) ─────────────────────────
 
-  /* header */
-  .pr-header { padding:40px 32px 32px; text-align:center; border-bottom:1px solid var(--c-border); }
-  .pr-header-success { background:linear-gradient(160deg,rgba(16,185,129,0.10) 0%,rgba(16,185,129,0.03) 100%); }
-  .pr-header-failed  { background:linear-gradient(160deg,rgba(248,113,113,0.10) 0%,rgba(248,113,113,0.03) 100%); }
+const VARIANTS = {
+  SUCCESS: {
+    icon: (
+      <svg className="w-8 h-8" fill="none" stroke="#10B981" viewBox="0 0 24 24" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+    ),
+    iconBg:   'bg-emerald-50 border border-emerald-200',
+    title:    'Thanh toán thành công',
+    titleCls: 'text-emerald-600',
+    headerBg: 'bg-gradient-to-b from-emerald-50/60 to-white',
+    badge:    { text: 'ĐÃ THANH TOÁN', cls: 'bg-emerald-50 border-emerald-200 text-emerald-600', dotCls: 'bg-emerald-400' },
+    subtitle: 'Giao dịch của bạn đã được xác nhận. Booking đã được kích hoạt.',
+    note:     '✅  Email xác nhận đặt phòng đã được gửi đến hộp thư của bạn. Vui lòng kiểm tra và xuất trình khi nhận phòng.',
+    noteCls:  'bg-emerald-50 border-emerald-200 text-emerald-800',
+  },
+  FAILED: {
+    icon: (
+      <svg className="w-8 h-8" fill="none" stroke="#F87171" viewBox="0 0 24 24" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    ),
+    iconBg:   'bg-red-50 border border-red-200',
+    title:    'Thanh toán thất bại',
+    titleCls: 'text-red-600',
+    headerBg: 'bg-gradient-to-b from-red-50/60 to-white',
+    badge:    { text: 'THẤT BẠI', cls: 'bg-red-50 border-red-200 text-red-500', dotCls: 'bg-red-400' },
+    subtitle: 'Giao dịch không được thực hiện. Vui lòng kiểm tra lại hoặc thử phương thức khác.',
+    note:     '⚠️  Nếu tiền đã bị trừ nhưng giao dịch thất bại, số tiền sẽ được hoàn lại trong 3–5 ngày làm việc.',
+    noteCls:  'bg-red-50 border-red-200 text-red-800',
+  },
+  PENDING: {
+    icon: (
+      <svg className="w-8 h-8" fill="none" stroke="#3B82F6" viewBox="0 0 24 24" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ),
+    iconBg:   'bg-blue-50 border border-blue-200',
+    title:    'Đặt phòng thành công',
+    titleCls: 'text-blue-600',
+    headerBg: 'bg-gradient-to-b from-blue-50/60 to-white',
+    badge:    { text: 'CHỜ THU TIỀN', cls: 'bg-blue-50 border-blue-200 text-blue-600', dotCls: 'bg-blue-400 animate-pulse' },
+    subtitle: 'Booking của bạn đã được xác nhận. Vui lòng thanh toán tiền mặt khi nhận phòng.',
+    note:     '💵  Mang theo tiền mặt đúng số tiền khi đến nhận phòng. Nhân viên sẽ thu và cấp hóa đơn tại quầy lễ tân.',
+    noteCls:  'bg-blue-50 border-blue-200 text-blue-800',
+  },
+};
 
-  .pr-icon { width:68px; height:68px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 18px; }
-  .pr-icon-success { background:rgba(16,185,129,0.12); border:1.5px solid rgba(16,185,129,0.3); }
-  .pr-icon-failed  { background:rgba(248,113,113,0.12); border:1.5px solid rgba(248,113,113,0.3); }
+// ── skeleton ────────────────────────────────────────────────────────────────
 
-  .pr-title { font-family:var(--font-b); font-size:26px; font-weight:700; letter-spacing:-0.01em; margin-bottom:6px; }
-  .pr-title-success { color:#059669; }
-  .pr-title-failed  { color:#DC2626; }
-
-  .pr-subtitle { font-size:13px; color:var(--c-muted); line-height:1.6; }
-
-  /* amount hero */
-  .pr-amount { font-family:var(--font-b); font-size:36px; font-weight:700; color:var(--c-gold); letter-spacing:-0.02em; margin-top:14px; }
-
-  /* status badge */
-  .pr-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 14px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.04em; margin-top:10px; }
-  .pr-badge-success { background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.25); color:#059669; }
-  .pr-badge-failed  { background:rgba(248,113,113,0.10); border:1px solid rgba(248,113,113,0.25); color:#DC2626; }
-  .pr-badge-dot { width:5px; height:5px; border-radius:50%; }
-  .pr-badge-dot-success { background:#10B981; }
-  .pr-badge-dot-failed  { background:#F87171; }
-
-  /* details */
-  .pr-details { padding:24px 28px; display:flex; flex-direction:column; gap:0; }
-  .pr-row { display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--c-border); font-size:13px; }
-  .pr-row:last-child { border-bottom:none; }
-  .pr-row-label { color:var(--c-muted); }
-  .pr-row-val { font-weight:600; color:var(--c-text); text-align:right; max-width:60%; word-break:break-all; }
-  .pr-row-val-mono { font-family:'Courier New',monospace; font-size:12px; color:var(--c-gold); background:rgba(201,168,76,0.1); padding:2px 8px; border-radius:5px; }
-  .pr-row-val-green { color:#059669; }
-
-  /* note box */
-  .pr-note { margin:0 28px 20px; padding:12px 16px; border-radius:10px; font-size:12px; line-height:1.65; }
-  .pr-note-success { background:rgba(16,185,129,0.07); border:1px solid rgba(16,185,129,0.2); color:#065F46; }
-  .pr-note-failed  { background:rgba(248,113,113,0.07); border:1px solid rgba(248,113,113,0.2); color:#991B1B; }
-
-  /* actions */
-  .pr-actions { display:flex; gap:10px; padding:20px 28px; border-top:1px solid var(--c-border); }
-  .pr-btn-primary {
-    flex:1; padding:13px; background:var(--c-gold); color:#0A0A0B;
-    font-size:13px; font-weight:700; border:none; border-radius:10px;
-    cursor:pointer; transition:var(--t); text-decoration:none;
-    display:flex; align-items:center; justify-content:center; gap:6px;
-    font-family:var(--font-b);
-  }
-  .pr-btn-primary:hover { background:#e0bc5e; box-shadow:0 4px 16px rgba(201,168,76,0.3); }
-  .pr-btn-secondary {
-    flex:1; padding:13px; background:rgba(255,255,255,0.04);
-    border:1px solid var(--c-border); color:var(--c-muted);
-    font-size:13px; font-weight:500; border-radius:10px;
-    cursor:pointer; transition:var(--t); text-decoration:none;
-    display:flex; align-items:center; justify-content:center;
-    font-family:var(--font-b);
-  }
-  .pr-btn-secondary:hover { color:var(--c-text); border-color:var(--c-border2); }
-  .pr-btn-dark {
-    flex:1; padding:13px; background:#1C1B18; color:#fff;
-    font-size:13px; font-weight:700; border:none; border-radius:10px;
-    cursor:pointer; transition:var(--t); text-decoration:none;
-    display:flex; align-items:center; justify-content:center; gap:6px;
-    font-family:var(--font-b);
-  }
-  .pr-btn-dark:hover { background:#333; }
-
-  /* skeleton */
-  .sk { background:linear-gradient(90deg,#e8e7e4 25%,#f0efe9 50%,#e8e7e4 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; border-radius:10px; }
-  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-
-  /* spin */
-  @keyframes spin { to{transform:rotate(360deg)} }
-  .spin { animation:spin 0.8s linear infinite; }
-
-  @media(max-width:500px) {
-    .pr-wrap { padding:24px 12px 60px; }
-    .pr-header { padding:28px 20px 24px; }
-    .pr-details { padding:16px 20px; }
-    .pr-actions { padding:16px 20px; }
-    .pr-note { margin:0 20px 16px; }
-    .pr-amount { font-size:28px; }
-  }
-`;
-
-/* ─── icon components ─────────────────────────────────────────── */
-function IconSuccess() {
-  return (
-    <svg width="32" height="32" fill="none" stroke="#10B981" viewBox="0 0 24 24" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
-    </svg>
-  );
-}
-function IconFailed() {
-  return (
-    <svg width="32" height="32" fill="none" stroke="#F87171" viewBox="0 0 24 24" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
-    </svg>
-  );
-}
-
-/* ─── skeleton ────────────────────────────────────────────────── */
 function Skeleton() {
   return (
-    <div className="pr-card">
-      <div style={{padding:'40px 32px 32px', textAlign:'center', borderBottom:'1px solid rgba(0,0,0,0.08)'}}>
-        <div className="sk" style={{width:'68px',height:'68px',borderRadius:'50%',margin:'0 auto 18px'}}/>
-        <div className="sk" style={{height:'28px',width:'200px',margin:'0 auto 8px'}}/>
-        <div className="sk" style={{height:'16px',width:'260px',margin:'0 auto 14px'}}/>
-        <div className="sk" style={{height:'40px',width:'160px',margin:'0 auto'}}/>
+    <div className="bg-white rounded-2xl border border-black/8 overflow-hidden shadow-lg">
+      <div className="px-8 py-10 text-center border-b border-black/6 space-y-4 animate-pulse">
+        <div className="w-16 h-16 rounded-full bg-gray-100 mx-auto" />
+        <div className="h-7 w-48 bg-gray-100 rounded-lg mx-auto" />
+        <div className="h-4 w-64 bg-gray-100 rounded mx-auto" />
+        <div className="h-10 w-36 bg-gray-100 rounded-xl mx-auto" />
+        <div className="h-6 w-28 bg-gray-100 rounded-full mx-auto" />
       </div>
-      <div style={{padding:'24px 28px'}}>
-        {[1,2,3,4].map(i => (
-          <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'11px 0',borderBottom:'1px solid rgba(0,0,0,0.06)'}}>
-            <div className="sk" style={{height:'14px',width:'100px'}}/>
-            <div className="sk" style={{height:'14px',width:'120px'}}/>
+      <div className="px-7 py-5 space-y-3 animate-pulse">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="flex justify-between py-2.5 border-b border-black/5">
+            <div className="h-3.5 w-24 bg-gray-100 rounded" />
+            <div className="h-3.5 w-32 bg-gray-100 rounded" />
           </div>
         ))}
       </div>
@@ -152,14 +97,34 @@ function Skeleton() {
   );
 }
 
-/* ─── main page ───────────────────────────────────────────────── */
+// ── detail row ──────────────────────────────────────────────────────────────
+
+function Row({ label, value, mono, green }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-black/5 last:border-0 text-sm gap-4">
+      <span className="text-[#6B6860] shrink-0">{label}</span>
+      <span className={`font-semibold text-right break-all max-w-[60%]
+        ${mono ? 'font-mono text-xs text-[#C9A84C] bg-[#C9A84C]/8 px-2 py-0.5 rounded-md' : ''}
+        ${green ? 'text-emerald-600' : 'text-[#1C1B18]'}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// ── main page ───────────────────────────────────────────────────────────────
+
 export default function PaymentResultPage() {
   const [searchParams] = useSearchParams();
-  const status    = searchParams.get('status');    // SUCCESS | FAILED
+  const navigate = useNavigate();
+
+  const status    = searchParams.get('status')    ?? 'FAILED'; // SUCCESS | FAILED | PENDING
   const paymentId = searchParams.get('paymentId');
+  const bookingId = searchParams.get('bookingId');
 
   const [payment, setPayment] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!paymentId);
 
   useEffect(() => {
     if (!paymentId) { setLoading(false); return; }
@@ -169,119 +134,172 @@ export default function PaymentResultPage() {
       .finally(() => setLoading(false));
   }, [paymentId]);
 
+  const v         = VARIANTS[status] ?? VARIANTS.FAILED;
   const isSuccess = status === 'SUCCESS';
+  const isPending = status === 'PENDING';
+  const amountFmt = fmtVnd(payment?.amount);
+
+  // bookingId: either from URL param directly (cash flow) or from payment record
+  const resolvedBookingId = bookingId ?? payment?.bookingId;
 
   return (
-    <>
-      <style>{CSS}</style>
-      <div className="pr-root">
-        <Navbar />
-        <div className="pr-wrap">
+    <div className="min-h-screen bg-[#F7F6F4]">
+      <Navbar />
 
-          {loading ? (
-            <Skeleton />
-          ) : (
-            <div className="pr-card">
+      <div className="max-w-lg mx-auto px-4 py-10 pb-20">
 
-              {/* ── Header ── */}
-              <div className={`pr-header ${isSuccess ? 'pr-header-success' : 'pr-header-failed'}`}>
-                <div className={`pr-icon ${isSuccess ? 'pr-icon-success' : 'pr-icon-failed'}`}>
-                  {isSuccess ? <IconSuccess /> : <IconFailed />}
-                </div>
+        {loading ? <Skeleton /> : (
+          <div className="bg-white rounded-2xl border border-black/8 overflow-hidden shadow-lg">
 
-                <div className={`pr-title ${isSuccess ? 'pr-title-success' : 'pr-title-failed'}`}>
-                  {isSuccess ? 'Thanh toán thành công' : 'Thanh toán thất bại'}
-                </div>
+            {/* ── header ──────────────────────────────────────────────── */}
+            <div className={`${v.headerBg} px-8 py-10 text-center border-b border-black/6`}>
 
-                <div className="pr-subtitle">
-                  {isSuccess
-                    ? 'Giao dịch của bạn đã được xác nhận. Booking đã được kích hoạt.'
-                    : 'Giao dịch không được thực hiện. Vui lòng kiểm tra lại thông tin hoặc thử phương thức khác.'
-                  }
-                </div>
-
-                {payment?.amount != null && (
-                  <div className="pr-amount">{fmtVnd(payment.amount)}</div>
-                )}
-
-                <div>
-                  <span className={`pr-badge ${isSuccess ? 'pr-badge-success' : 'pr-badge-failed'}`}>
-                    <span className={`pr-badge-dot ${isSuccess ? 'pr-badge-dot-success' : 'pr-badge-dot-failed'}`}/>
-                    {isSuccess ? 'ĐÃ THANH TOÁN' : 'THẤT BẠI'}
-                  </span>
-                </div>
+              {/* icon circle */}
+              <div className={`w-16 h-16 rounded-full ${v.iconBg} flex items-center justify-center mx-auto mb-5`}>
+                {v.icon}
               </div>
 
-              {/* ── Details ── */}
-              {payment && (
-                <div className="pr-details">
-                  {payment.transactionId && (
-                    <div className="pr-row">
-                      <span className="pr-row-label">Mã giao dịch</span>
-                      <span className="pr-row-val pr-row-val-mono">{payment.transactionId}</span>
-                    </div>
-                  )}
-                  {paymentId && (
-                    <div className="pr-row">
-                      <span className="pr-row-label">Mã thanh toán</span>
-                      <span className="pr-row-val pr-row-val-mono">{paymentId}</span>
-                    </div>
-                  )}
-                  {payment.bookingId && (
-                    <div className="pr-row">
-                      <span className="pr-row-label">Mã đặt phòng</span>
-                      <span className="pr-row-val" style={{fontFamily:"'Courier New',monospace",fontSize:'12px'}}>{payment.bookingId}</span>
-                    </div>
-                  )}
-                  {payment.method && (
-                    <div className="pr-row">
-                      <span className="pr-row-label">Phương thức</span>
-                      <span className="pr-row-val">{METHOD_LABEL[payment.method] ?? payment.method}</span>
-                    </div>
-                  )}
-                  {payment.paidAt && isSuccess && (
-                    <div className="pr-row">
-                      <span className="pr-row-label">Thời gian</span>
-                      <span className="pr-row-val pr-row-val-green">{fmtDt(payment.paidAt)}</span>
-                    </div>
-                  )}
-                </div>
+              {/* title */}
+              <h1 className={`text-2xl font-bold ${v.titleCls} mb-2`}>
+                {v.title}
+              </h1>
+
+              {/* subtitle */}
+              <p className="text-sm text-[#6B6860] leading-relaxed mb-4">
+                {v.subtitle}
+              </p>
+
+              {/* amount — only show if we have it and it's not cash pending */}
+              {amountFmt && !isPending && (
+                <p className="text-4xl font-bold text-[#C9A84C] tracking-tight mb-4">
+                  {amountFmt}
+                </p>
               )}
 
-              {/* ── Note ── */}
-              <div className={`pr-note ${isSuccess ? 'pr-note-success' : 'pr-note-failed'}`}>
-                {isSuccess
-                  ? '✅ Email xác nhận đặt phòng đã được gửi đến hộp thư của bạn. Vui lòng kiểm tra và xuất trình khi nhận phòng.'
-                  : '⚠️ Nếu tiền đã bị trừ nhưng giao dịch thất bại, số tiền sẽ được hoàn lại trong vòng 3–5 ngày làm việc. Liên hệ hotrovnpay@vnpay.vn nếu cần hỗ trợ.'
-                }
-              </div>
+              {/* status badge */}
+              <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-bold tracking-wider border ${v.badge.cls}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${v.badge.dotCls}`} />
+                {v.badge.text}
+              </span>
+            </div>
 
-              {/* ── Actions ── */}
-              <div className="pr-actions">
-                {isSuccess ? (
-                  <>
-                    {payment?.bookingId
-                      ? <Link to={`/my-bookings/${payment.bookingId}`} className="pr-btn-primary">Xem đặt phòng</Link>
-                      : <Link to="/my-bookings" className="pr-btn-primary">Lịch sử đặt phòng</Link>
-                    }
-                    <Link to="/" className="pr-btn-secondary">Về trang chủ</Link>
-                  </>
-                ) : (
-                  <>
-                    {payment?.bookingId
-                      ? <Link to={`/payment/${payment.bookingId}`} className="pr-btn-dark">Thử lại</Link>
-                      : <Link to="/my-bookings" className="pr-btn-dark">Xem đặt phòng</Link>
-                    }
-                    <Link to="/" className="pr-btn-secondary">Về trang chủ</Link>
-                  </>
+            {/* ── details ─────────────────────────────────────────────── */}
+            {(payment || resolvedBookingId) && (
+              <div className="px-7 py-4">
+                {payment?.transactionId && (
+                  <Row label="Mã giao dịch"  value={payment.transactionId}  mono />
+                )}
+                {paymentId && (
+                  <Row label="Mã thanh toán" value={paymentId}              mono />
+                )}
+                {resolvedBookingId && (
+                  <Row label="Mã đặt phòng"  value={resolvedBookingId} />
+                )}
+                {payment?.method && (
+                  <Row label="Phương thức"   value={METHOD_LABEL[payment.method] ?? payment.method} />
+                )}
+                {isSuccess && payment?.paidAt && (
+                  <Row label="Thời gian"     value={fmtDt(payment.paidAt)} green />
                 )}
               </div>
+            )}
 
+            {/* ── cash pending — hướng dẫn thu công ──────────────────── */}
+            {isPending && (
+              <div className="px-7 pb-2">
+                <div className="bg-[#F7F6F4] rounded-xl p-4 border border-black/8">
+                  <p className="text-xs font-semibold text-[#6B6860] uppercase tracking-wider mb-3">
+                    Quy trình thu tiền mặt
+                  </p>
+                  <ol className="space-y-2">
+                    {[
+                      'Đến khách sạn đúng ngày nhận phòng',
+                      'Xuất trình mã đặt phòng cho nhân viên',
+                      'Thanh toán tiền mặt tại quầy lễ tân',
+                      'Nhận hóa đơn và tiến hành nhận phòng',
+                    ].map((step, i) => (
+                      <li key={i} className="flex items-start gap-3 text-sm text-[#6B6860]">
+                        <span className="shrink-0 w-5 h-5 rounded-full bg-blue-100 border border-blue-200 text-blue-600 text-[10px] font-bold flex items-center justify-center mt-0.5">
+                          {i + 1}
+                        </span>
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </div>
+            )}
+
+            {/* ── note box ────────────────────────────────────────────── */}
+            <div className={`mx-7 my-4 px-4 py-3 rounded-xl text-xs leading-relaxed border ${v.noteCls}`}>
+              {v.note}
             </div>
-          )}
 
+            {/* ── action buttons ───────────────────────────────────────── */}
+            <div className="px-7 pb-7 pt-1 flex gap-3">
+              {isSuccess || isPending ? (
+                <>
+                  {resolvedBookingId ? (
+                    <Link
+                      to={`/my-bookings/${resolvedBookingId}`}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#C9A84C] hover:bg-[#e0bc5e] text-[#0A0A0B] text-sm font-bold rounded-xl transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      Xem đặt phòng
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/my-bookings"
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#C9A84C] hover:bg-[#e0bc5e] text-[#0A0A0B] text-sm font-bold rounded-xl transition-colors">
+                      Lịch sử đặt phòng
+                    </Link>
+                  )}
+                  <Link
+                    to="/"
+                    className="flex-1 flex items-center justify-center py-3 border border-black/10 text-[#6B6860] hover:text-[#1C1B18] hover:border-black/20 text-sm font-medium rounded-xl transition-colors">
+                    Về trang chủ
+                  </Link>
+                </>
+              ) : (
+                <>
+                  {resolvedBookingId ? (
+                    <Link
+                      to={`/payment/${resolvedBookingId}`}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#0A0A0B] hover:bg-[#1C1B18] text-white text-sm font-bold rounded-xl transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Thử lại
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/my-bookings"
+                      className="flex-1 flex items-center justify-center py-3 bg-[#0A0A0B] hover:bg-[#1C1B18] text-white text-sm font-bold rounded-xl transition-colors">
+                      Xem đặt phòng
+                    </Link>
+                  )}
+                  <Link
+                    to="/"
+                    className="flex-1 flex items-center justify-center py-3 border border-black/10 text-[#6B6860] hover:text-[#1C1B18] hover:border-black/20 text-sm font-medium rounded-xl transition-colors">
+                    Về trang chủ
+                  </Link>
+                </>
+              )}
+            </div>
+
+          </div>
+        )}
+
+        {/* back link */}
+        <div className="text-center mt-6">
+          <button onClick={() => navigate(-1)}
+            className="text-xs text-[#A09D96] hover:text-[#6B6860] transition-colors cursor-pointer">
+            ← Quay lại
+          </button>
         </div>
+
       </div>
-    </>
+    </div>
   );
 }

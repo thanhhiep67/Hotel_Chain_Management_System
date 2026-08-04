@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -34,6 +35,16 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.<Void>builder()
                         .statusCode(HttpStatus.METHOD_NOT_ALLOWED.value())
                         .message("Method '" + ex.getMethod() + "' is not supported for this endpoint")
+                        .build());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.<Void>builder()
+                        .statusCode(HttpStatus.FORBIDDEN.value())
+                        .message("Bạn không có quyền thực hiện thao tác này")
                         .build());
     }
 

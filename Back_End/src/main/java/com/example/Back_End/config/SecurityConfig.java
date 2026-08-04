@@ -55,6 +55,8 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/stats", "/stats/**").permitAll()
                         // VNPay callbacks — không có JWT (browser redirect & server-to-server)
                         .requestMatchers("/payments/vnpay/return", "/payments/vnpay/ipn").permitAll()
+                        // Swagger UI / OpenAPI docs
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         // Tất cả còn lại cần token
                         .anyRequest().authenticated()
                 )

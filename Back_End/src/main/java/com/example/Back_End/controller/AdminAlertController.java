@@ -6,6 +6,9 @@ import com.example.Back_End.exception.AppException;
 import com.example.Back_End.exception.ErrorCode;
 import com.example.Back_End.model.ReviewAlert;
 import com.example.Back_End.repository.ReviewAlertRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Tag(name = "Admin Alerts", description = "Cảnh báo đánh giá bất thường — dành cho ADMIN")
 @RestController
 @RequestMapping("/admin/review-alerts")
 @RequiredArgsConstructor
@@ -23,7 +27,7 @@ public class AdminAlertController {
 
     private final ReviewAlertRepository reviewAlertRepository;
 
-    /** GET /admin/review-alerts?resolved=false */
+    @Operation(summary = "Danh sách cảnh báo review (ADMIN)", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping
     public ResponseEntity<ApiResponse<List<ReviewAlertResponse>>> getAlerts(
             @RequestParam(defaultValue = "false") boolean resolved) {
@@ -34,7 +38,7 @@ public class AdminAlertController {
         return ok(data);
     }
 
-    /** PATCH /admin/review-alerts/{id}/resolve */
+    @Operation(summary = "Đánh dấu cảnh báo đã xử lý (ADMIN)", security = @SecurityRequirement(name = "bearerAuth"))
     @PatchMapping("/{id}/resolve")
     public ResponseEntity<ApiResponse<ReviewAlertResponse>> resolve(@PathVariable String id) {
         ReviewAlert alert = reviewAlertRepository.findById(id)
