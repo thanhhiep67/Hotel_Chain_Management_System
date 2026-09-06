@@ -1,9 +1,31 @@
-import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense, Component } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import { searchHotels, getNearbyHotels } from '../api/hotels'
 
 const MapView = lazy(() => import('../components/MapView'))
+
+/* ─── Map error boundary (prevents full-page blank when Leaflet fails) ─*/
+class MapErrorBoundary extends Component {
+  state = { error: null }
+  static getDerivedStateFromError(err) { return { error: err } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{
+          height: '100%', background: '#EDEAE4',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          gap: 10, color: '#A09D96', fontSize: 13,
+        }}>
+          <span style={{ fontSize: 32 }}>🗺️</span>
+          <span>Không thể tải bản đồ</span>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 /* ─── CSS (injected once) ───────────────────────────────────────*/
 let cssInjected = false
@@ -460,6 +482,7 @@ export default function SearchPage() {
   /* data */
   const [hotels,        setHotels]        = useState([])
   const [loading,       setLoading]       = useState(true)
+  const [fetchError,    setFetchError]    = useState(null)
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages,    setTotalPages]    = useState(0)
 
@@ -470,6 +493,7 @@ export default function SearchPage() {
   /* fetch */
   useEffect(() => {
     setLoading(true)
+    setFetchError(null)
     if (isNearby && nearbyLat && nearbyLng) {
       getNearbyHotels(nearbyLat, nearbyLng, fetchKm, 40)
         .then(res => {
@@ -478,7 +502,11 @@ export default function SearchPage() {
           setTotalElements(list.length)
           setTotalPages(1)
         })
-        .catch(() => {})
+        .catch(() => {
+          setFetchError('Không thể tải danh sách khách sạn gần bạn. Vui lòng thử lại.')
+          setHotels([])
+          setTotalElements(0)
+        })
         .finally(() => setLoading(false))
     } else {
       searchHotels({
@@ -495,7 +523,11 @@ export default function SearchPage() {
           setTotalElements(d.totalElements ?? 0)
           setTotalPages(d.totalPages ?? 0)
         })
-        .catch(() => {})
+        .catch(() => {
+          setFetchError('Không thể tải danh sách khách sạn. Vui lòng thử lại.')
+          setHotels([])
+          setTotalElements(0)
+        })
         .finally(() => setLoading(false))
     }
   }, [filters, page, isNearby, nearbyLat, nearbyLng, fetchKm])
@@ -665,8 +697,17 @@ export default function SearchPage() {
               />
             ))}
 
+            {/* Error state */}
+            {!loading && fetchError && (
+              <div className="sp-empty">
+                <div className="sp-empty-icon">⚠️</div>
+                <div className="sp-empty-title">Lỗi kết nối</div>
+                <div className="sp-empty-sub">{fetchError}</div>
+              </div>
+            )}
+
             {/* Empty state */}
-            {!loading && sorted.length === 0 && (
+            {!loading && !fetchError && sorted.length === 0 && (
               <div className="sp-empty">
                 <div className="sp-empty-icon">{isNearby ? '📍' : '🔍'}</div>
                 <div className="sp-empty-title">
@@ -687,6 +728,7 @@ export default function SearchPage() {
 
         {/* ── Right: map ── */}
         <div className="sp-map-panel">
+          <MapErrorBoundary>
           <Suspense fallback={
             <div className="sp-map-fallback">
               <div className="sp-spinner" />
@@ -707,6 +749,7 @@ export default function SearchPage() {
               radiusKm={sliderKm}
             />
           </Suspense>
+          </MapErrorBoundary>
         </div>
 
       </div>

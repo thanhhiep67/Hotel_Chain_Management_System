@@ -70,14 +70,14 @@ public class AnalyticsService {
         long totalBookings = mongoTemplate.count(
                 Query.query(Criteria.where("hotelId").is(hotelId)), Booking.class);
 
-        // Doanh thu tháng hiện tại (PAID)
-        LocalDateTime startOfMonth = YearMonth.now().atDay(1).atStartOfDay();
-        LocalDateTime endOfMonth   = YearMonth.now().atEndOfMonth().atTime(23, 59, 59);
+        // Doanh thu tháng hiện tại — tính theo checkIn (ngày khách đến), không phải createdAt
+        LocalDate startOfMonthDate = YearMonth.now().atDay(1);
+        LocalDate endOfMonthDate   = YearMonth.now().atEndOfMonth();
 
         Aggregation revenueAgg = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where("hotelId").is(hotelId)
                         .and("paymentStatus").is(PaymentStatus.PAID.name())
-                        .and("createdAt").gte(startOfMonth).lte(endOfMonth)),
+                        .and("checkIn").gte(startOfMonthDate).lte(endOfMonthDate)),
                 Aggregation.group().sum("totalPrice").as("total")
         );
         Document revenueDoc = mongoTemplate
@@ -111,21 +111,19 @@ public class AnalyticsService {
                                              String period, LocalDate from, LocalDate to) {
         getHotelForOwner(ownerEmail, hotelId);
 
-        LocalDateTime fromDt = from.atStartOfDay();
-        LocalDateTime toDt   = to.atTime(23, 59, 59);
-
         boolean weekly = "weekly".equalsIgnoreCase(period);
 
         // Project năm + tháng/tuần, rồi group
         Aggregation agg;
+        // Dùng checkIn (ngày khách đến) để xác định kỳ doanh thu
         if (weekly) {
             agg = Aggregation.newAggregation(
                     Aggregation.match(Criteria.where("hotelId").is(hotelId)
                             .and("paymentStatus").is(PaymentStatus.PAID.name())
-                            .and("createdAt").gte(fromDt).lte(toDt)),
+                            .and("checkIn").gte(from).lte(to)),
                     Aggregation.project()
-                            .and(DateOperators.Year.yearOf("createdAt")).as("year")
-                            .and(DateOperators.Week.weekOf("createdAt")).as("week")
+                            .and(DateOperators.Year.yearOf("checkIn")).as("year")
+                            .and(DateOperators.Week.weekOf("checkIn")).as("week")
                             .and("totalPrice").as("totalPrice"),
                     Aggregation.group(Fields.from(Fields.field("year"), Fields.field("week")))
                             .sum("totalPrice").as("revenue")
@@ -136,10 +134,10 @@ public class AnalyticsService {
             agg = Aggregation.newAggregation(
                     Aggregation.match(Criteria.where("hotelId").is(hotelId)
                             .and("paymentStatus").is(PaymentStatus.PAID.name())
-                            .and("createdAt").gte(fromDt).lte(toDt)),
+                            .and("checkIn").gte(from).lte(to)),
                     Aggregation.project()
-                            .and(DateOperators.Year.yearOf("createdAt")).as("year")
-                            .and(DateOperators.Month.monthOf("createdAt")).as("month")
+                            .and(DateOperators.Year.yearOf("checkIn")).as("year")
+                            .and(DateOperators.Month.monthOf("checkIn")).as("month")
                             .and("totalPrice").as("totalPrice"),
                     Aggregation.group(Fields.from(Fields.field("year"), Fields.field("month")))
                             .sum("totalPrice").as("revenue")

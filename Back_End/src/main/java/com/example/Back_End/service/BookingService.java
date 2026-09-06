@@ -17,6 +17,7 @@ import com.example.Back_End.model.enums.BookingStatus;
 import com.example.Back_End.model.enums.RoomStatus;
 import com.example.Back_End.model.enums.UserRole;
 import com.example.Back_End.model.Payment;
+import com.example.Back_End.model.enums.PaymentMethod;
 import com.example.Back_End.model.enums.PaymentStatus;
 import com.example.Back_End.dto.response.PaymentNotification;
 import com.example.Back_End.repository.BookingRepository;
@@ -518,6 +519,9 @@ public class BookingService {
         @CacheEvict(value = "analytics:overview",       allEntries = true),
         @CacheEvict(value = "analytics:booking-status", allEntries = true),
         @CacheEvict(value = "analytics:revenue",        allEntries = true),
+        @CacheEvict(value = "analytics:top-rooms",      allEntries = true),
+        @CacheEvict(value = "analytics:price",          allEntries = true),
+        @CacheEvict(value = "analytics:forecast",       allEntries = true),
     })
     public BookingResponse checkOut(String bookingId, String staffEmail) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -533,6 +537,21 @@ public class BookingService {
         verifyStaffAccess(hotel, staffEmail);
 
         booking.setStatus(BookingStatus.CHECKED_OUT);
+        // Thanh toán tiền mặt chưa được ghi nhận → tạo payment record và đánh dấu PAID
+        if (booking.getPaymentStatus() == PaymentStatus.UNPAID) {
+            booking.setPaymentStatus(PaymentStatus.PAID);
+            LocalDateTime now = LocalDateTime.now();
+            paymentRepository.save(Payment.builder()
+                    .bookingId(booking.getId())
+                    .userId(booking.getUserId())
+                    .method(PaymentMethod.CASH)
+                    .amount(booking.getTotalPrice())
+                    .currency("VND")
+                    .status(PaymentStatus.PAID)
+                    .paidAt(now)
+                    .createdAt(now)
+                    .build());
+        }
 
         Booking saved = bookingRepository.save(booking);
         Room room = roomRepository.findById(saved.getRoomId()).orElse(null);

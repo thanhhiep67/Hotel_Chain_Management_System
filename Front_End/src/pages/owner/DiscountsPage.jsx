@@ -44,6 +44,21 @@ function discountToForm(d) {
   };
 }
 
+const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+
+function FormField({ label, required, hint, children }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+        {label}{required && ' *'}{hint && (
+          <span className="normal-case font-normal text-gray-400 ml-1">{hint}</span>
+        )}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 export default function DiscountsPage() {
   const [discounts,  setDiscounts]  = useState([]);
   const [hotels,     setHotels]     = useState([]);
@@ -149,19 +164,6 @@ export default function DiscountsPage() {
   const hotelName = (hotelId) =>
     hotelId ? (hotels.find(h => h.id === hotelId)?.name ?? hotelId) : 'Tất cả khách sạn';
 
-  const FormField = ({ label, required, hint, children }) => (
-    <div>
-      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-        {label}{required && ' *'}{hint && (
-          <span className="normal-case font-normal text-gray-400 ml-1">{hint}</span>
-        )}
-      </label>
-      {children}
-    </div>
-  );
-
-  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -215,29 +217,29 @@ export default function DiscountsPage() {
               </FormField>
 
               <FormField label="Giá trị" required hint={form.type === 'PERCENTAGE' ? '(%)' : '(đ)'}>
-                <input type="number" min="0" value={form.value}
-                  onChange={e => set('value', e.target.value)}
+                <input type="text" inputMode="numeric" value={form.value}
+                  onChange={e => set('value', e.target.value.replace(/[^0-9.]/g, ''))}
                   placeholder={form.type === 'PERCENTAGE' ? 'VD: 20' : 'VD: 200000'}
                   className={inputCls} />
               </FormField>
 
               <FormField label="Đơn tối thiểu (đ)" hint="(tùy chọn)">
-                <input type="number" min="0" value={form.minOrderAmount}
-                  onChange={e => set('minOrderAmount', e.target.value)}
+                <input type="text" inputMode="numeric" value={form.minOrderAmount}
+                  onChange={e => set('minOrderAmount', e.target.value.replace(/[^0-9]/g, ''))}
                   placeholder="VD: 500000" className={inputCls} />
               </FormField>
 
               {form.type === 'PERCENTAGE' && (
                 <FormField label="Trần giảm tối đa (đ)" hint="(tùy chọn)">
-                  <input type="number" min="0" value={form.maxDiscount}
-                    onChange={e => set('maxDiscount', e.target.value)}
+                  <input type="text" inputMode="numeric" value={form.maxDiscount}
+                    onChange={e => set('maxDiscount', e.target.value.replace(/[^0-9]/g, ''))}
                     placeholder="VD: 500000" className={inputCls} />
                 </FormField>
               )}
 
               <FormField label="Số lần dùng" hint="(để trống = không giới hạn)">
-                <input type="number" min="1" value={form.usageLimit}
-                  onChange={e => set('usageLimit', e.target.value)}
+                <input type="text" inputMode="numeric" value={form.usageLimit}
+                  onChange={e => set('usageLimit', e.target.value.replace(/[^0-9]/g, ''))}
                   placeholder="VD: 100" className={inputCls} />
               </FormField>
 

@@ -79,6 +79,7 @@ public class HotelService {
 
         return hotelRepository.findByOwnerId(owner.getId())
                 .stream()
+                .filter(h -> h.getStatus() != HotelStatus.REJECTED && h.getStatus() != HotelStatus.INACTIVE)
                 .map(this::toResponse)
                 .toList();
     }
@@ -87,6 +88,9 @@ public class HotelService {
     public HotelDetailResponse getHotelById(String hotelId) {
         Hotel hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new AppException(ErrorCode.HOTEL_NOT_FOUND));
+        if (hotel.getStatus() == HotelStatus.REJECTED || hotel.getStatus() == HotelStatus.INACTIVE) {
+            throw new AppException(ErrorCode.HOTEL_NOT_FOUND);
+        }
 
         List<RoomResponse> rooms = roomRepository.findByHotelId(hotelId)
                 .stream()
@@ -284,6 +288,12 @@ public class HotelService {
         hotel.setStatus(request.getStatus());
         hotel.setUpdatedAt(LocalDateTime.now());
 
+        // Khi duyệt khách sạn mà chưa có toạ độ → thử geocode để tìm được qua nearby search
+        if (request.getStatus() == HotelStatus.APPROVED && hotel.getLocation() == null) {
+            GeoLocation loc = resolveLocation(null, null, hotel.getAddress(), hotel.getCity());
+            if (loc != null) hotel.setLocation(loc);
+        }
+
         return toResponse(hotelRepository.save(hotel));
     }
 
@@ -305,6 +315,8 @@ public class HotelService {
     }
 
     private NearbyHotelResponse toNearbyResponse(Hotel hotel, double distanceKm) {
+        Double minPrice = roomRepository.findByHotelIdAndStatus(hotel.getId(), RoomStatus.AVAILABLE)
+                .stream().mapToDouble(Room::getPricePerNight).min().stream().boxed().findFirst().orElse(null);
         return NearbyHotelResponse.builder()
                 .id(hotel.getId())
                 .name(hotel.getName())
@@ -317,6 +329,7 @@ public class HotelService {
                 .status(hotel.getStatus())
                 .avgRating(hotel.getAvgRating())
                 .reviewCount(hotel.getReviewCount())
+                .minPrice(minPrice)
                 .distanceKm(Math.round(distanceKm * 100.0) / 100.0)
                 .build();
     }
@@ -347,6 +360,8 @@ public class HotelService {
     }
 
     private HotelResponse toResponse(Hotel hotel) {
+        Double minPrice = roomRepository.findByHotelIdAndStatus(hotel.getId(), RoomStatus.AVAILABLE)
+                .stream().mapToDouble(Room::getPricePerNight).min().stream().boxed().findFirst().orElse(null);
         return HotelResponse.builder()
                 .id(hotel.getId())
                 .ownerId(hotel.getOwnerId())
@@ -360,6 +375,7 @@ public class HotelService {
                 .status(hotel.getStatus())
                 .avgRating(hotel.getAvgRating())
                 .reviewCount(hotel.getReviewCount())
+                .minPrice(minPrice)
                 .createdAt(hotel.getCreatedAt())
                 .build();
     }

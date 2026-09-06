@@ -25,6 +25,7 @@ public class NearbyHotelResponse {
     private HotelStatus status;
     private Double avgRating;
     private Integer reviewCount;
+    private Double minPrice;
     /** Khoảng cách từ điểm tìm kiếm tới khách sạn, tính bằng km (làm tròn 2 chữ số) */
     private Double distanceKm;
 }

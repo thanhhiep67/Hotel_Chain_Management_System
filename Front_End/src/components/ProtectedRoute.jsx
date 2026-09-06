@@ -5,17 +5,18 @@ function isTokenExpired(token) {
     const exp = JSON.parse(atob(token.split('.')[1])).exp; // seconds
     return exp * 1000 < Date.now();
   } catch {
-    return true; // malformed → treat as expired
+    return true;
   }
 }
 
 export default function ProtectedRoute({ children, roles }) {
-  const token = localStorage.getItem('accessToken');
-  const user  = JSON.parse(localStorage.getItem('user') ?? 'null');
-  const location = useLocation();
+  const refreshToken = localStorage.getItem('refreshToken');
+  const user         = JSON.parse(localStorage.getItem('user') ?? 'null');
+  const location     = useLocation();
 
-  // No token, no user, OR access token already expired → go login
-  if (!token || !user || isTokenExpired(token)) {
+  // Chỉ redirect khi refresh token không hợp lệ / hết hạn.
+  // Access token hết hạn → axios interceptor tự refresh — không cần check ở đây.
+  if (!user || !refreshToken || isTokenExpired(refreshToken)) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 

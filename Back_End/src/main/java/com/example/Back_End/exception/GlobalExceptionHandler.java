@@ -3,12 +3,14 @@ package com.example.Back_End.exception;
 import com.example.Back_End.dto.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 @Slf4j
 @RestControllerAdvice
@@ -46,6 +48,12 @@ public class GlobalExceptionHandler {
                         .statusCode(HttpStatus.FORBIDDEN.value())
                         .message("Bạn không có quyền thực hiện thao tác này")
                         .build());
+    }
+
+    // Client đóng kết nối trước khi server ghi xong — không phải lỗi thật, bỏ qua
+    @ExceptionHandler({AsyncRequestNotUsableException.class, ClientAbortException.class})
+    public void handleClientAbort() {
+        // no-op: connection already gone, nothing to write back
     }
 
     @ExceptionHandler(Exception.class)

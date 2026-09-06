@@ -27,5 +27,6 @@ public class HotelResponse {
     private HotelStatus status;
     private Double avgRating;
     private Integer reviewCount;
+    private Double minPrice;
     private LocalDateTime createdAt;
 }
