@@ -53,9 +53,11 @@ jobs:
           SPRING_DATA_MONGODB_PORT: 27017
           SPRING_DATA_REDIS_HOST: localhost
           SPRING_DATA_REDIS_PORT: 6379
-          JWT_SECRET: ${{ secrets.JWT_SECRET || '5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437' }}
-          SPRING_MAIL_USERNAME: ci@example.com
-          SPRING_MAIL_PASSWORD: dummy
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SPRING_MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          SPRING_MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          VNPAY_TMN_CODE: ${{ secrets.VNPAY_TMN_CODE }}
+          VNPAY_HASH_SECRET: ${{ secrets.VNPAY_HASH_SECRET }}
         run: mvn test -Dspring.mail.host=localhost -Dspring.mail.port=25 || true
 
       - name: Upload JAR artifact
