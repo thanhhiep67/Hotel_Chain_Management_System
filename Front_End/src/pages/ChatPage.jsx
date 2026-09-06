@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { API_BASE_URL } from '../config';
 import useChatSocket from '../hooks/useChatSocket';
 import {
   getMessages, sendMessage, markMessagesRead, getThreadInfo,
@@ -87,7 +88,7 @@ function ReplyQuote({ content, onCancel }) {
 
 /* ── Message bubble ── */
 function Bubble({ msg, isMe, onReply, userRole }) {
-  const BASE_URL = 'http://localhost:8080';
+  const BASE_URL = API_BASE_URL;
   const bookingPath = userRole === 'USER'
     ? `/my-bookings/${msg.bookingId}`
     : userRole === 'OWNER'

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { API_BASE_URL } from '../config';
 
 /**
  * Subscribe to real-time booking notifications for a hotel.
@@ -21,7 +22,7 @@ export default function useBookingSocket(hotelId, onNotification) {
 
     const token = localStorage.getItem('accessToken');
     const client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+      webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws`),
       connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
       reconnectDelay: 5000,
       onConnect: () => {

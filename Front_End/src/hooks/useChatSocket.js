@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { API_BASE_URL } from '../config';
 
 /**
  * Manages the WebSocket connection for a chat thread.
@@ -20,7 +21,7 @@ export default function useChatSocket(threadId, onMessage, onTyping) {
     if (!threadId) return;
 
     const client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+      webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws`),
       reconnectDelay: 5000,
       // beforeConnect chạy trước mỗi lần kết nối/reconnect — luôn đọc token mới nhất từ localStorage
       beforeConnect: () => {

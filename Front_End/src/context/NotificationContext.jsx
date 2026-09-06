@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { API_BASE_URL } from '../config';
 import { getMyHotels } from '../api/hotels';
 import { getMyNotifications, markAllNotifRead, clearAllNotifs } from '../api/notifications';
 
@@ -105,7 +106,7 @@ export function NotificationProvider({ children }) {
 
     const clients = topics.map((topic) => {
       const client = new Client({
-        webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+        webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws`),
         connectHeaders,
         reconnectDelay: 5000,
         onConnect: () => {

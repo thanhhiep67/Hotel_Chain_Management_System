@@ -1,7 +1,6 @@
 import api from './axios';
 import axios from 'axios';
-
-const BASE_URL = 'http://localhost:8080';
+import { API_BASE_URL as BASE_URL } from '../config';
 
 export const getOverview        = (hotelId)               => api.get('/analytics/overview',          { params: { hotelId } });
 export const getRevenue         = (hotelId, params)        => api.get('/analytics/revenue',            { params: { hotelId, ...params } });

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getHotelReviews, createReview, uploadReviewImage } from '../api/reviews';
 import { getMyBookings } from '../api/bookings';
 
-const BASE_URL = 'http://localhost:8080';
+import { API_BASE_URL as BASE_URL } from '../config';
 
 /* ── helpers ── */
 const fmtDate = (iso) => {
