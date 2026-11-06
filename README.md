@@ -285,6 +285,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <div align="center">
 
-Made with by [HuynhThanhHiep](https://github.com/HuynhThanhHiep)
+Made with by [HuynhThanhHiep](https://github.com/thanhhiep67)
 
 </div>
